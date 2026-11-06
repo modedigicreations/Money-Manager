@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import {
   getPlatformSnapshot,
+  authenticateUser,
+  registerCustomerAccount,
+  createTeamMemberAccount,
   fundCustomerWallet,
   upsertRepaymentParameter,
   applyForLoanWithStandingOrder,
@@ -31,9 +34,26 @@ export async function POST(req: NextRequest) {
     const body = await req.json();
     const { action, payload, currentUserId } = body;
 
-    let result: unknown;
+    let result: any;
+    let targetSnapshotUserId =
+      currentUserId || payload?.userId || "usr_adaeze";
 
     switch (action) {
+      case "LOGIN": {
+        result = authenticateUser(payload);
+        if (result.user.role === "CUSTOMER") {
+          targetSnapshotUserId = result.user.id as string;
+        }
+        break;
+      }
+      case "REGISTER_CUSTOMER": {
+        result = registerCustomerAccount(payload);
+        targetSnapshotUserId = result.user.id as string;
+        break;
+      }
+      case "CREATE_TEAM_MEMBER":
+        result = createTeamMemberAccount(payload);
+        break;
       case "FUND_WALLET":
         result = await fundCustomerWallet(payload);
         break;
@@ -71,9 +91,7 @@ export async function POST(req: NextRequest) {
         );
     }
 
-    const snapshot = getPlatformSnapshot(
-      currentUserId || payload?.userId || "usr_adaeze"
-    );
+    const snapshot = getPlatformSnapshot(targetSnapshotUserId);
     return NextResponse.json({ ok: true, result, data: snapshot });
   } catch (err: unknown) {
     const message =

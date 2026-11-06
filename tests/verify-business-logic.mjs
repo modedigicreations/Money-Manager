@@ -2,13 +2,18 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 import path from "node:path";
 
-const dbFile = path.join(process.cwd(), "prisma", "dev.db");
+const projectDir = path.resolve(import.meta.dirname, "..");
+process.chdir(projectDir);
+const dbFile = path.join(projectDir, "prisma", "dev.db");
 if (fs.existsSync(dbFile)) {
   fs.unlinkSync(dbFile);
 }
 
 const {
   getPlatformSnapshot,
+  authenticateUser,
+  registerCustomerAccount,
+  createTeamMemberAccount,
   fundCustomerWallet,
   upsertRepaymentParameter,
   applyForLoanWithStandingOrder,
@@ -180,6 +185,59 @@ console.log("=== 9. Verifying Batch Standing Order Cycle ===");
 const batchRes = runBatchStandingOrderCycle();
 assert.ok(batchRes.processedCount >= 1);
 console.log("✓ Batch Standing Order Cycle verified:", batchRes);
+
+console.log("=== 10. Verifying Customer Signup, Separate Login Routing & Super Admin Team Member Creation ===");
+// 10a. Customer Registration creates customer + wallet and routes to CUSTOMER_DASHBOARD
+const regRes = registerCustomerAccount({
+  fullName: "Ngozi Obi",
+  email: "ngozi.obi@dbcapital.ng",
+  phone: "+234 806 111 2233",
+  password: "MySecurePassword123",
+  accountType: "INDIVIDUAL",
+  bvn: "22334455667",
+  nin: "66554433221",
+});
+assert.equal(regRes.user.role, "CUSTOMER");
+assert.equal(regRes.dashboardRoute, "CUSTOMER_DASHBOARD");
+assert.ok(regRes.walletAccountNumber);
+const ngoziSnap = getPlatformSnapshot(regRes.user.id);
+assert.equal(ngoziSnap.currentUser.email, "ngozi.obi@dbcapital.ng");
+assert.equal(ngoziSnap.wallet.accountNumber, regRes.walletAccountNumber);
+
+// 10b. Customer Login routes to CUSTOMER_DASHBOARD
+const custLogin = authenticateUser({
+  email: "ngozi.obi@dbcapital.ng",
+  password: "MySecurePassword123",
+});
+assert.equal(custLogin.user.role, "CUSTOMER");
+assert.equal(custLogin.dashboardRoute, "CUSTOMER_DASHBOARD");
+
+// 10c. Super Admin Login routes to ADMIN_DASHBOARD
+const adminLogin = authenticateUser({
+  email: "superadmin@dbcapital.ng",
+  password: "Admin@123",
+});
+assert.equal(adminLogin.user.role, "SUPER_ADMIN");
+assert.equal(adminLogin.dashboardRoute, "ADMIN_DASHBOARD");
+
+// 10d. Super Admin creates a Team Member account, and Team Member logs in to ADMIN_DASHBOARD
+const teamRes = createTeamMemberAccount({
+  creatorUserId: adminLogin.user.id,
+  fullName: "Kemi Adeyemi",
+  email: "kemi.adeyemi@dbcapital.ng",
+  phone: "+234 809 555 6677",
+  password: "TeamPassword@2026",
+  role: "TEAM_MEMBER",
+  department: "Back Office & Treasury",
+});
+assert.equal(teamRes.teamMember.role, "TEAM_MEMBER");
+const teamLogin = authenticateUser({
+  email: "kemi.adeyemi@dbcapital.ng",
+  password: "TeamPassword@2026",
+});
+assert.equal(teamLogin.user.role, "TEAM_MEMBER");
+assert.equal(teamLogin.dashboardRoute, "ADMIN_DASHBOARD");
+console.log("✓ Customer registration, login separation, and Super Admin team member creation verified.");
 
 // Clean up dev.db so the initial seed state is fresh for the application
 for (const ext of ["", "-wal", "-shm"]) {

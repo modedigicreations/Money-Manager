@@ -30,6 +30,11 @@ import {
   Clock,
   Truck,
   BadgeCheck,
+  LogIn,
+  LogOut,
+  UserPlus,
+  Users,
+  KeyRound,
 } from "lucide-react";
 
 type PlatformMode = "WEBSITE" | "CUSTOMER_PORTAL" | "BACK_OFFICE";
@@ -44,13 +49,45 @@ type AdminTab =
   | "LOAN_DISBURSEMENTS"
   | "STANDING_ORDER_ENGINE"
   | "CARD_OPERATIONS"
-  | "SYSTEM_LEDGER";
+  | "SYSTEM_LEDGER"
+  | "TEAM_MEMBERS";
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
 export default function DBCapitalPlatformPage() {
-  const [platformMode, setPlatformMode] =
-    useState<PlatformMode>("CUSTOMER_PORTAL");
+  const [authUser, setAuthUser] = useState<any>(null);
+  const [authMode, setAuthMode] = useState<"LOGIN" | "REGISTER">("LOGIN");
+
+  // Login Form State
+  const [loginEmail, setLoginEmail] = useState<string>("");
+  const [loginPassword, setLoginPassword] = useState<string>("");
+
+  // Customer Registration Form State
+  const [regFullName, setRegFullName] = useState<string>("");
+  const [regEmail, setRegEmail] = useState<string>("");
+  const [regPhone, setRegPhone] = useState<string>("+234 803 ");
+  const [regPassword, setRegPassword] = useState<string>("");
+  const [regAccountType, setRegAccountType] = useState<
+    "INDIVIDUAL" | "BUSINESS"
+  >("INDIVIDUAL");
+  const [regBusinessName, setRegBusinessName] = useState<string>("");
+  const [regRcNumber, setRegRcNumber] = useState<string>("");
+  const [regBvn, setRegBvn] = useState<string>("22490182734");
+  const [regNin, setRegNin] = useState<string>("59182736450");
+
+  // Super Admin Team Member Creation Form State
+  const [staffFullName, setStaffFullName] = useState<string>("");
+  const [staffEmail, setStaffEmail] = useState<string>("");
+  const [staffPhone, setStaffPhone] = useState<string>("+234 802 ");
+  const [staffPassword, setStaffPassword] = useState<string>("Staff@123");
+  const [staffRole, setStaffRole] = useState<
+    "TEAM_MEMBER" | "ADMIN" | "SUPER_ADMIN"
+  >("TEAM_MEMBER");
+  const [staffDepartment, setStaffDepartment] = useState<string>(
+    "Credit & Underwriting Operations"
+  );
+
+  const [platformMode, setPlatformMode] = useState<PlatformMode>("WEBSITE");
   const [portalTab, setPortalTab] = useState<PortalTab>("OVERVIEW");
   const [adminTab, setAdminTab] = useState<AdminTab>("REPAYMENT_PARAMS");
 
@@ -136,8 +173,105 @@ export default function DBCapitalPlatformPage() {
   }, []);
 
   useEffect(() => {
+    try {
+      const saved = sessionStorage.getItem("dbc_auth_user");
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        setAuthUser(parsed);
+        if (parsed.role === "CUSTOMER") {
+          setSelectedUserId(parsed.id);
+          setPlatformMode("CUSTOMER_PORTAL");
+        } else {
+          setPlatformMode("BACK_OFFICE");
+        }
+      }
+    } catch {
+      // ignore storage errors
+    }
+  }, []);
+
+  useEffect(() => {
     fetchSnapshot(selectedUserId);
   }, [selectedUserId, fetchSnapshot]);
+
+  const isAdminSession =
+    authUser &&
+    (authUser.role === "SUPER_ADMIN" ||
+      authUser.role === "ADMIN" ||
+      authUser.role === "TEAM_MEMBER");
+
+  async function handleLoginSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    const res = await runPlatformAction(
+      "LOGIN",
+      { email: loginEmail, password: loginPassword },
+      "Signed in successfully!"
+    );
+    if (res && res.user) {
+      setAuthUser(res.user);
+      sessionStorage.setItem("dbc_auth_user", JSON.stringify(res.user));
+      if (res.user.role === "CUSTOMER") {
+        setSelectedUserId(res.user.id);
+        setPlatformMode("CUSTOMER_PORTAL");
+        setPortalTab("OVERVIEW");
+        setBanner({
+          type: "success",
+          text: `Welcome back, ${res.user.fullName}! Routed to your Customer Dashboard.`,
+        });
+      } else {
+        setPlatformMode("BACK_OFFICE");
+        setAdminTab("REPAYMENT_PARAMS");
+        setBanner({
+          type: "success",
+          text: `Welcome back, ${res.user.fullName} (${res.user.role.replace(
+            "_",
+            " "
+          )})! Routed to the Admin Dashboard & Back Office.`,
+        });
+      }
+    }
+  }
+
+  async function handleRegisterCustomerSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    const res = await runPlatformAction(
+      "REGISTER_CUSTOMER",
+      {
+        fullName: regFullName,
+        email: regEmail,
+        phone: regPhone,
+        password: regPassword,
+        accountType: regAccountType,
+        businessName: regBusinessName,
+        rcNumber: regRcNumber,
+        bvn: regBvn,
+        nin: regNin,
+      },
+      "Customer account & Prepaid Wallet created!"
+    );
+    if (res && res.user) {
+      setAuthUser(res.user);
+      sessionStorage.setItem("dbc_auth_user", JSON.stringify(res.user));
+      setSelectedUserId(res.user.id);
+      setPlatformMode("CUSTOMER_PORTAL");
+      setPortalTab("OVERVIEW");
+      setBanner({
+        type: "success",
+        text: `Welcome to DB Capital, ${res.user.fullName}! Your Prepaid Wallet (${res.walletAccountNumber}) is active.`,
+      });
+    }
+  }
+
+  function handleLogout() {
+    setAuthUser(null);
+    sessionStorage.removeItem("dbc_auth_user");
+    setPlatformMode("WEBSITE");
+    setAuthMode("LOGIN");
+    setBanner({
+      type: "info",
+      text: "You have been signed out and returned to the standalone frontend.",
+    });
+  }
 
   async function runPlatformAction(
     action: string,
@@ -276,76 +410,166 @@ export default function DBCapitalPlatformPage() {
             </div>
           </div>
 
-          {/* Three Platform Switcher (Website | Customer Portal | Super Admin Back Office) */}
-          <div className="flex items-center bg-navy-950/70 p-1 rounded-xl border border-white/10">
-            <button
-              onClick={() => setPlatformMode("WEBSITE")}
-              className={`flex items-center gap-1.5 px-3.5 py-2 rounded-lg text-xs font-semibold transition-all ${
-                platformMode === "WEBSITE"
-                  ? "bg-dbc-gold-gradient text-navy-950 shadow"
-                  : "text-slate-300 hover:text-white"
-              }`}
-            >
-              <Globe className="w-3.5 h-3.5" />
-              1. Website & Blueprint
-            </button>
-            <button
-              onClick={() => setPlatformMode("CUSTOMER_PORTAL")}
-              className={`flex items-center gap-1.5 px-3.5 py-2 rounded-lg text-xs font-semibold transition-all ${
-                platformMode === "CUSTOMER_PORTAL"
-                  ? "bg-dbc-gold-gradient text-navy-950 shadow"
-                  : "text-slate-300 hover:text-white"
-              }`}
-            >
-              <Smartphone className="w-3.5 h-3.5" />
-              2. Customer Wallet & App
-            </button>
-            <button
-              onClick={() => setPlatformMode("BACK_OFFICE")}
-              className={`flex items-center gap-1.5 px-3.5 py-2 rounded-lg text-xs font-semibold transition-all ${
-                platformMode === "BACK_OFFICE"
-                  ? "bg-dbc-gold-gradient text-navy-950 shadow"
-                  : "text-slate-300 hover:text-white"
-              }`}
-            >
-              <Monitor className="w-3.5 h-3.5" />
-              3. Super Admin Back Office
-            </button>
-          </div>
-
-          {/* Active Customer Persona Selector & Quick Wallet Pill */}
-          <div className="flex items-center gap-3">
-            <div className="flex items-center gap-2 bg-white/10 px-3 py-1.5 rounded-lg border border-white/15">
-              <span className="text-[11px] text-gold-300 uppercase font-semibold">
-                Customer:
-              </span>
-              <select
-                value={selectedUserId}
-                onChange={(e) => setSelectedUserId(e.target.value)}
-                className="bg-transparent text-xs font-semibold text-white focus:outline-none cursor-pointer"
+          {/* Role-Based Navigation & Session Controls */}
+          {!authUser ? (
+            <div className="flex items-center gap-2.5">
+              <button
+                onClick={() => {
+                  setPlatformMode("WEBSITE");
+                  setAuthMode("LOGIN");
+                  document
+                    .getElementById("auth-portal-card")
+                    ?.scrollIntoView({ behavior: "smooth" });
+                }}
+                className={`flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-bold transition ${
+                  authMode === "LOGIN"
+                    ? "bg-white/15 text-gold-300 border border-gold-400/40"
+                    : "text-slate-300 hover:text-white"
+                }`}
               >
-                {(snapshot?.users || [])
-                  .filter((u: any) => u.role === "CUSTOMER")
-                  .map((u: any) => (
-                    <option
-                      key={u.id}
-                      value={u.id}
-                      className="bg-navy-900 text-white"
-                    >
-                      {u.fullName} ({u.accountType})
-                    </option>
-                  ))}
-              </select>
+                <LogIn className="w-3.5 h-3.5" />
+                Sign In
+              </button>
+              <button
+                onClick={() => {
+                  setPlatformMode("WEBSITE");
+                  setAuthMode("REGISTER");
+                  document
+                    .getElementById("auth-portal-card")
+                    ?.scrollIntoView({ behavior: "smooth" });
+                }}
+                className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-dbc-gold-gradient text-navy-950 text-xs font-extrabold shadow"
+              >
+                <UserPlus className="w-3.5 h-3.5" />
+                Create Customer Account
+              </button>
             </div>
-            <div className="hidden md:flex flex-col items-end bg-gold-500/15 border border-gold-400/30 px-3 py-1 rounded-lg">
-              <span className="text-[10px] uppercase tracking-wider text-gold-300">
-                Prepaid Wallet Balance
-              </span>
-              <span className="text-sm font-extrabold text-white">
-                {formatNgn(wallet?.balance)}
-              </span>
+          ) : isAdminSession ? (
+            <>
+              {/* Admin Dashboard: Full Switcher (Back Office + Customer Wallet Inspector + Website) */}
+              <div className="flex items-center bg-navy-950/70 p-1 rounded-xl border border-white/10">
+                <button
+                  onClick={() => setPlatformMode("BACK_OFFICE")}
+                  className={`flex items-center gap-1.5 px-3.5 py-2 rounded-lg text-xs font-semibold transition-all ${
+                    platformMode === "BACK_OFFICE"
+                      ? "bg-dbc-gold-gradient text-navy-950 shadow"
+                      : "text-slate-300 hover:text-white"
+                  }`}
+                >
+                  <Monitor className="w-3.5 h-3.5" />
+                  Admin Back Office
+                </button>
+                <button
+                  onClick={() => setPlatformMode("CUSTOMER_PORTAL")}
+                  className={`flex items-center gap-1.5 px-3.5 py-2 rounded-lg text-xs font-semibold transition-all ${
+                    platformMode === "CUSTOMER_PORTAL"
+                      ? "bg-dbc-gold-gradient text-navy-950 shadow"
+                      : "text-slate-300 hover:text-white"
+                  }`}
+                >
+                  <Smartphone className="w-3.5 h-3.5" />
+                  Inspect Customer Wallet
+                </button>
+                <button
+                  onClick={() => setPlatformMode("WEBSITE")}
+                  className={`flex items-center gap-1.5 px-3.5 py-2 rounded-lg text-xs font-semibold transition-all ${
+                    platformMode === "WEBSITE"
+                      ? "bg-dbc-gold-gradient text-navy-950 shadow"
+                      : "text-slate-300 hover:text-white"
+                  }`}
+                >
+                  <Globe className="w-3.5 h-3.5" />
+                  Website View
+                </button>
+              </div>
+
+              {/* Admin Customer Wallet Selector & Sign Out */}
+              <div className="flex items-center gap-2.5">
+                <div className="flex items-center gap-2 bg-white/10 px-3 py-1.5 rounded-lg border border-white/15">
+                  <span className="text-[10px] text-gold-300 uppercase font-bold">
+                    Inspect Wallet:
+                  </span>
+                  <select
+                    value={selectedUserId}
+                    onChange={(e) => setSelectedUserId(e.target.value)}
+                    className="bg-transparent text-xs font-semibold text-white focus:outline-none cursor-pointer"
+                  >
+                    {(snapshot?.users || [])
+                      .filter((u: any) => u.role === "CUSTOMER")
+                      .map((u: any) => (
+                        <option
+                          key={u.id}
+                          value={u.id}
+                          className="bg-navy-900 text-white"
+                        >
+                          {u.fullName} ({u.accountType})
+                        </option>
+                      ))}
+                  </select>
+                </div>
+                <div className="hidden lg:flex flex-col items-end bg-gold-500/15 border border-gold-400/30 px-3 py-1 rounded-lg">
+                  <span className="text-[10px] uppercase tracking-wider text-gold-300 font-bold">
+                    {authUser.role.replace("_", " ")}
+                  </span>
+                  <span className="text-xs font-extrabold text-white">
+                    {authUser.fullName}
+                  </span>
+                </div>
+                <button
+                  onClick={handleLogout}
+                  className="flex items-center gap-1 px-3 py-2 rounded-lg bg-rose-500/20 hover:bg-rose-500/30 border border-rose-400/30 text-rose-200 text-xs font-bold transition"
+                >
+                  <LogOut className="w-3.5 h-3.5" />
+                  Sign Out
+                </button>
+              </div>
+            </>
+          ) : (
+            /* Standalone Customer Session Header */
+            <div className="flex items-center gap-3">
+              <div className="flex items-center bg-navy-950/70 p-1 rounded-xl border border-white/10">
+                <button
+                  onClick={() => setPlatformMode("CUSTOMER_PORTAL")}
+                  className={`flex items-center gap-1.5 px-3.5 py-2 rounded-lg text-xs font-semibold transition-all ${
+                    platformMode === "CUSTOMER_PORTAL"
+                      ? "bg-dbc-gold-gradient text-navy-950 shadow"
+                      : "text-slate-300 hover:text-white"
+                  }`}
+                >
+                  <Wallet className="w-3.5 h-3.5" />
+                  My Customer Dashboard
+                </button>
+                <button
+                  onClick={() => setPlatformMode("WEBSITE")}
+                  className={`flex items-center gap-1.5 px-3.5 py-2 rounded-lg text-xs font-semibold transition-all ${
+                    platformMode === "WEBSITE"
+                      ? "bg-dbc-gold-gradient text-navy-950 shadow"
+                      : "text-slate-300 hover:text-white"
+                  }`}
+                >
+                  <Globe className="w-3.5 h-3.5" />
+                  Home
+                </button>
+              </div>
+
+              <div className="hidden sm:flex flex-col items-end bg-gold-500/15 border border-gold-400/30 px-3 py-1 rounded-lg">
+                <span className="text-[10px] uppercase tracking-wider text-gold-300">
+                  My Wallet Balance
+                </span>
+                <span className="text-sm font-extrabold text-white">
+                  {formatNgn(wallet?.balance)}
+                </span>
+              </div>
+
+              <button
+                onClick={handleLogout}
+                className="flex items-center gap-1 px-3 py-2 rounded-lg bg-rose-500/20 hover:bg-rose-500/30 border border-rose-400/30 text-rose-200 text-xs font-bold transition"
+              >
+                <LogOut className="w-3.5 h-3.5" />
+                Sign Out
+              </button>
             </div>
-          </div>
+          )}
         </div>
       </header>
 
@@ -380,14 +604,14 @@ export default function DBCapitalPlatformPage() {
       )}
 
       {/* ===================================================================== */}
-      {/* VIEW 1: EXECUTIVE WEBSITE & SYSTEM ARCHITECTURE                       */}
+      {/* VIEW 1: STANDALONE FRONTEND, CUSTOMER SIGNUP & UNIFIED LOGIN PORTAL    */}
       {/* ===================================================================== */}
-      {platformMode === "WEBSITE" && (
+      {(platformMode === "WEBSITE" || !authUser) && (
         <main className="flex-1">
-          {/* Hero Section */}
+          {/* Hero Section with Standalone Login / Customer Registration Portal */}
           <section className="bg-dbc-navy-gradient text-white py-12 px-4 sm:px-6 border-b-4 border-gold-500">
-            <div className="max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-12 gap-8 items-center">
-              <div className="lg:col-span-7 space-y-5">
+            <div className="max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+              <div className="lg:col-span-7 space-y-5 pt-2">
                 <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-gold-500/20 border border-gold-400/40 text-gold-300 text-xs font-semibold">
                   <Sparkles className="w-3.5 h-3.5" />
                   Build Once. Integrate Later. Deliver Excellence.
@@ -398,86 +622,474 @@ export default function DBCapitalPlatformPage() {
                 </h1>
                 <p className="text-slate-300 text-base sm:text-lg max-w-2xl leading-relaxed">
                   A unified digital financial platform with one smart card,
-                  prepaid wallets, personal loans, and business finance. Fund
-                  your wallet, apply for credit disbursed straight to your
-                  wallet, and automate repayments via Standing Orders governed
-                  by transparent parameters.
+                  prepaid wallets, personal loans, and business finance. Create
+                  your customer account to get an instant prepaid wallet, apply
+                  for credit disbursed straight to your wallet, and automate
+                  repayments via Standing Orders.
                 </p>
-                <div className="flex flex-wrap gap-3 pt-2">
-                  <button
-                    onClick={() => {
-                      setPlatformMode("CUSTOMER_PORTAL");
-                      setPortalTab("OVERVIEW");
-                    }}
-                    className="px-5 py-3 rounded-xl bg-dbc-gold-gradient text-navy-950 font-bold text-sm shadow-lg hover:opacity-95 transition flex items-center gap-2"
-                  >
-                    Open Customer Wallet & Portal
-                    <ArrowUpRight className="w-4 h-4" />
-                  </button>
-                  <button
-                    onClick={() => {
-                      setPlatformMode("CUSTOMER_PORTAL");
-                      setPortalTab("LOANS_AND_CREDIT");
-                    }}
-                    className="px-5 py-3 rounded-xl bg-white/10 hover:bg-white/15 border border-white/20 text-white font-semibold text-sm transition"
-                  >
-                    Apply for Loan & Standing Order
-                  </button>
-                  <button
-                    onClick={() => setPlatformMode("BACK_OFFICE")}
-                    className="px-5 py-3 rounded-xl bg-navy-800 hover:bg-navy-700 border border-gold-500/40 text-gold-300 font-semibold text-sm transition"
-                  >
-                    Super Admin Back Office
-                  </button>
+
+                {!authUser ? (
+                  <div className="flex flex-wrap gap-3 pt-2">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setAuthMode("REGISTER");
+                        document
+                          .getElementById("auth-portal-card")
+                          ?.scrollIntoView({ behavior: "smooth" });
+                      }}
+                      className="px-5 py-3 rounded-xl bg-dbc-gold-gradient text-navy-950 font-bold text-sm shadow-lg hover:opacity-95 transition flex items-center gap-2"
+                    >
+                      <UserPlus className="w-4 h-4" />
+                      Create Customer Account
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setAuthMode("LOGIN");
+                        document
+                          .getElementById("auth-portal-card")
+                          ?.scrollIntoView({ behavior: "smooth" });
+                      }}
+                      className="px-5 py-3 rounded-xl bg-white/10 hover:bg-white/15 border border-white/20 text-white font-semibold text-sm transition flex items-center gap-2"
+                    >
+                      <LogIn className="w-4 h-4" />
+                      Customer & Admin Sign In
+                    </button>
+                  </div>
+                ) : (
+                  <div className="flex flex-wrap gap-3 pt-2">
+                    <button
+                      onClick={() => {
+                        setPlatformMode("CUSTOMER_PORTAL");
+                        setPortalTab("OVERVIEW");
+                      }}
+                      className="px-5 py-3 rounded-xl bg-dbc-gold-gradient text-navy-950 font-bold text-sm shadow-lg hover:opacity-95 transition flex items-center gap-2"
+                    >
+                      {isAdminSession
+                        ? "Inspect Customer Wallet Portal"
+                        : "Go to My Customer Dashboard"}
+                      <ArrowUpRight className="w-4 h-4" />
+                    </button>
+                    {isAdminSession && (
+                      <button
+                        onClick={() => setPlatformMode("BACK_OFFICE")}
+                        className="px-5 py-3 rounded-xl bg-navy-800 hover:bg-navy-700 border border-gold-500/40 text-gold-300 font-semibold text-sm transition"
+                      >
+                        Return to Admin Back Office
+                      </button>
+                    )}
+                  </div>
+                )}
+
+                {/* Smart Card Preview Banner */}
+                <div className="pt-4">
+                  <div className="rounded-2xl bg-gradient-to-br from-navy-900 via-navy-950 to-black p-5 border border-gold-500/40 shadow-xl max-w-lg relative overflow-hidden">
+                    <div className="flex items-center justify-between mb-3">
+                      <div>
+                        <p className="text-[11px] uppercase tracking-widest text-gold-400 font-bold">
+                          DB CAPITAL SMART CARD & PREPAID WALLET
+                        </p>
+                        <p className="text-[10px] text-slate-400">
+                          Powered by Flutterwave Gateway • Virtual & Physical Cards
+                        </p>
+                      </div>
+                      <div className="w-8 h-8 rounded-lg bg-dbc-gold-gradient flex items-center justify-center text-navy-950 font-black text-xs">
+                        DB
+                      </div>
+                    </div>
+                    <p className="font-mono text-lg tracking-widest text-gold-300 font-bold mb-2">
+                      5399 •••• •••• 8492
+                    </p>
+                    <div className="flex items-center justify-between text-[11px] text-slate-300 border-t border-white/10 pt-2">
+                      <span>ONE CARD, MULTIPLE SERVICES</span>
+                      <span className="text-gold-400 font-bold">
+                        INSTANT WALLET DISBURSEMENT
+                      </span>
+                    </div>
+                  </div>
                 </div>
               </div>
 
-              {/* Interactive Card Visual in Hero */}
-              <div className="lg:col-span-5">
-                <div className="rounded-2xl bg-gradient-to-br from-navy-900 via-navy-950 to-black p-6 border-2 border-gold-500/60 shadow-2xl relative overflow-hidden">
-                  <div className="absolute -right-12 -top-12 w-44 h-44 rounded-full bg-gold-500/15 blur-2xl pointer-events-none" />
-                  <div className="flex items-center justify-between mb-6">
-                    <div>
-                      <p className="text-xs uppercase tracking-widest text-gold-400 font-bold">
-                        DB CAPITAL SMART CARD
-                      </p>
-                      <p className="text-[11px] text-slate-400">
-                        Powered by Flutterwave Gateway
-                      </p>
+              {/* Right Column: Standalone Auth Portal (Sign In / Create Customer Account) */}
+              <div className="lg:col-span-5" id="auth-portal-card">
+                {!authUser ? (
+                  <div className="bg-white text-slate-900 rounded-2xl border-2 border-gold-500/70 shadow-2xl overflow-hidden">
+                    {/* Auth Mode Switcher Tabs */}
+                    <div className="grid grid-cols-2 bg-navy-950 p-1.5 border-b border-slate-200">
+                      <button
+                        type="button"
+                        onClick={() => setAuthMode("LOGIN")}
+                        className={`py-2.5 px-3 rounded-xl text-xs font-extrabold flex items-center justify-center gap-1.5 transition ${
+                          authMode === "LOGIN"
+                            ? "bg-dbc-gold-gradient text-navy-950 shadow"
+                            : "text-slate-300 hover:text-white"
+                        }`}
+                      >
+                        <LogIn className="w-3.5 h-3.5" />
+                        Sign In (Customer / Admin)
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setAuthMode("REGISTER")}
+                        className={`py-2.5 px-3 rounded-xl text-xs font-extrabold flex items-center justify-center gap-1.5 transition ${
+                          authMode === "REGISTER"
+                            ? "bg-dbc-gold-gradient text-navy-950 shadow"
+                            : "text-slate-300 hover:text-white"
+                        }`}
+                      >
+                        <UserPlus className="w-3.5 h-3.5" />
+                        Create Customer Account
+                      </button>
                     </div>
-                    <div className="w-10 h-10 rounded-lg bg-dbc-gold-gradient flex items-center justify-center text-navy-950 font-black">
-                      DB
+
+                    {authMode === "LOGIN" ? (
+                      <form
+                        onSubmit={handleLoginSubmit}
+                        className="p-6 space-y-4"
+                      >
+                        <div>
+                          <span className="text-[11px] font-bold uppercase tracking-wider text-gold-600">
+                            Unified Frontend Portal
+                          </span>
+                          <h2 className="text-lg font-extrabold text-navy-900">
+                            Sign In to Your Account
+                          </h2>
+                          <p className="text-xs text-slate-500 mt-0.5">
+                            Customers are routed to their{" "}
+                            <strong>Customer Dashboard</strong>. Super Admin &
+                            Team Members are routed to the{" "}
+                            <strong>Admin Dashboard</strong>.
+                          </p>
+                        </div>
+
+                        <div className="space-y-3">
+                          <div>
+                            <label className="block text-xs font-bold text-slate-700 mb-1">
+                              Email Address
+                            </label>
+                            <input
+                              type="email"
+                              required
+                              value={loginEmail}
+                              onChange={(e) => setLoginEmail(e.target.value)}
+                              placeholder="you@example.com"
+                              className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-sm font-semibold text-navy-900 focus:outline-none focus:border-navy-900"
+                            />
+                          </div>
+
+                          <div>
+                            <label className="block text-xs font-bold text-slate-700 mb-1">
+                              Password
+                            </label>
+                            <input
+                              type="password"
+                              required
+                              value={loginPassword}
+                              onChange={(e) => setLoginPassword(e.target.value)}
+                              placeholder="••••••••"
+                              className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-sm font-semibold text-navy-900 focus:outline-none focus:border-navy-900"
+                            />
+                          </div>
+                        </div>
+
+                        <button
+                          type="submit"
+                          disabled={busyAction === "LOGIN"}
+                          className="w-full py-3 rounded-xl bg-dbc-navy-gradient text-gold-400 font-extrabold text-xs shadow-lg hover:opacity-95 transition flex items-center justify-center gap-2"
+                        >
+                          <LogIn className="w-4 h-4" />
+                          {busyAction === "LOGIN"
+                            ? "Signing In..."
+                            : "Sign In to Dashboard"}
+                        </button>
+
+                        {/* Quick Demo Credentials Selector */}
+                        <div className="pt-3 border-t border-slate-200 space-y-2">
+                          <div className="flex items-center justify-between">
+                            <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500 flex items-center gap-1">
+                              <KeyRound className="w-3 h-3 text-gold-600" />
+                              Quick Demo Credentials (Click to Fill)
+                            </span>
+                          </div>
+                          <div className="grid grid-cols-2 gap-1.5 text-[11px]">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setLoginEmail("adaeze.okafor@dbcapital.ng");
+                                setLoginPassword("Customer@123");
+                              }}
+                              className="p-2 rounded-lg border border-slate-200 bg-slate-50 hover:bg-gold-50 hover:border-gold-400 text-left transition"
+                            >
+                              <span className="font-bold text-navy-900 block">
+                                Individual Customer
+                              </span>
+                              <span className="text-[10px] text-slate-500 font-mono">
+                                adaeze.okafor@dbcapital.ng
+                              </span>
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setLoginEmail("tunde@lagostradelink.ng");
+                                setLoginPassword("Customer@123");
+                              }}
+                              className="p-2 rounded-lg border border-slate-200 bg-slate-50 hover:bg-gold-50 hover:border-gold-400 text-left transition"
+                            >
+                              <span className="font-bold text-navy-900 block">
+                                Business Customer
+                              </span>
+                              <span className="text-[10px] text-slate-500 font-mono">
+                                tunde@lagostradelink.ng
+                              </span>
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setLoginEmail("superadmin@dbcapital.ng");
+                                setLoginPassword("Admin@123");
+                              }}
+                              className="p-2 rounded-lg border border-gold-400/60 bg-gold-50/60 hover:bg-gold-100 text-left transition"
+                            >
+                              <span className="font-bold text-navy-950 block">
+                                Super Admin Login
+                              </span>
+                              <span className="text-[10px] text-slate-600 font-mono">
+                                superadmin@dbcapital.ng
+                              </span>
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setLoginEmail("funke.adebayo@dbcapital.ng");
+                                setLoginPassword("Staff@123");
+                              }}
+                              className="p-2 rounded-lg border border-slate-200 bg-slate-50 hover:bg-gold-50 hover:border-gold-400 text-left transition"
+                            >
+                              <span className="font-bold text-navy-900 block">
+                                Team Member Login
+                              </span>
+                              <span className="text-[10px] text-slate-500 font-mono">
+                                funke.adebayo@dbcapital.ng
+                              </span>
+                            </button>
+                          </div>
+                        </div>
+                      </form>
+                    ) : (
+                      <form
+                        onSubmit={handleRegisterCustomerSubmit}
+                        className="p-6 space-y-3.5"
+                      >
+                        <div>
+                          <span className="text-[11px] font-bold uppercase tracking-wider text-gold-600">
+                            Instant Customer Onboarding & Wallet
+                          </span>
+                          <h2 className="text-lg font-extrabold text-navy-900">
+                            Create Your Customer Account
+                          </h2>
+                          <p className="text-xs text-slate-500 mt-0.5">
+                            Provisions your dedicated NGN Prepaid Wallet and
+                            takes you straight to your Customer Dashboard.
+                          </p>
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-2">
+                          {(["INDIVIDUAL", "BUSINESS"] as const).map((type) => (
+                            <button
+                              key={type}
+                              type="button"
+                              onClick={() => setRegAccountType(type)}
+                              className={`py-2 px-3 rounded-xl text-xs font-bold border transition ${
+                                regAccountType === type
+                                  ? "bg-navy-900 text-gold-400 border-navy-900"
+                                  : "bg-slate-50 text-slate-600 border-slate-200"
+                              }`}
+                            >
+                              {type === "INDIVIDUAL"
+                                ? "Individual Account"
+                                : "Business / SME Account"}
+                            </button>
+                          ))}
+                        </div>
+
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 text-xs">
+                          <div>
+                            <label className="font-bold text-slate-700 block mb-1">
+                              Full Name *
+                            </label>
+                            <input
+                              type="text"
+                              required
+                              value={regFullName}
+                              onChange={(e) => setRegFullName(e.target.value)}
+                              placeholder="e.g. Chinedu Eze"
+                              className="w-full px-3 py-2 rounded-lg border border-slate-300 font-semibold text-navy-900"
+                            />
+                          </div>
+                          <div>
+                            <label className="font-bold text-slate-700 block mb-1">
+                              Phone Number *
+                            </label>
+                            <input
+                              type="tel"
+                              required
+                              value={regPhone}
+                              onChange={(e) => setRegPhone(e.target.value)}
+                              placeholder="+234 803 000 0000"
+                              className="w-full px-3 py-2 rounded-lg border border-slate-300 font-semibold text-navy-900"
+                            />
+                          </div>
+                        </div>
+
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 text-xs">
+                          <div>
+                            <label className="font-bold text-slate-700 block mb-1">
+                              Email Address *
+                            </label>
+                            <input
+                              type="email"
+                              required
+                              value={regEmail}
+                              onChange={(e) => setRegEmail(e.target.value)}
+                              placeholder="you@domain.com"
+                              className="w-full px-3 py-2 rounded-lg border border-slate-300 font-semibold text-navy-900"
+                            />
+                          </div>
+                          <div>
+                            <label className="font-bold text-slate-700 block mb-1">
+                              Password *
+                            </label>
+                            <input
+                              type="password"
+                              required
+                              value={regPassword}
+                              onChange={(e) => setRegPassword(e.target.value)}
+                              placeholder="Min 4 characters"
+                              className="w-full px-3 py-2 rounded-lg border border-slate-300 font-semibold text-navy-900"
+                            />
+                          </div>
+                        </div>
+
+                        {regAccountType === "BUSINESS" && (
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 text-xs">
+                            <div>
+                              <label className="font-bold text-slate-700 block mb-1">
+                                Registered Business Name *
+                              </label>
+                              <input
+                                type="text"
+                                required
+                                value={regBusinessName}
+                                onChange={(e) =>
+                                  setRegBusinessName(e.target.value)
+                                }
+                                placeholder="e.g. Zenith Logistics Ltd"
+                                className="w-full px-3 py-2 rounded-lg border border-slate-300 font-semibold text-navy-900"
+                              />
+                            </div>
+                            <div>
+                              <label className="font-bold text-slate-700 block mb-1">
+                                CAC RC Number
+                              </label>
+                              <input
+                                type="text"
+                                value={regRcNumber}
+                                onChange={(e) => setRegRcNumber(e.target.value)}
+                                placeholder="RC-1928374"
+                                className="w-full px-3 py-2 rounded-lg border border-slate-300 font-mono text-navy-900"
+                              />
+                            </div>
+                          </div>
+                        )}
+
+                        <div className="grid grid-cols-2 gap-2.5 text-xs">
+                          <div>
+                            <label className="font-bold text-slate-700 block mb-1">
+                              11-Digit BVN (KYC)
+                            </label>
+                            <input
+                              type="text"
+                              maxLength={11}
+                              value={regBvn}
+                              onChange={(e) => setRegBvn(e.target.value)}
+                              placeholder="22345678901"
+                              className="w-full px-3 py-2 rounded-lg border border-slate-300 font-mono text-navy-900"
+                            />
+                          </div>
+                          <div>
+                            <label className="font-bold text-slate-700 block mb-1">
+                              11-Digit NIN (KYC)
+                            </label>
+                            <input
+                              type="text"
+                              maxLength={11}
+                              value={regNin}
+                              onChange={(e) => setRegNin(e.target.value)}
+                              placeholder="55443322110"
+                              className="w-full px-3 py-2 rounded-lg border border-slate-300 font-mono text-navy-900"
+                            />
+                          </div>
+                        </div>
+
+                        <button
+                          type="submit"
+                          disabled={busyAction === "REGISTER_CUSTOMER"}
+                          className="w-full py-3 rounded-xl bg-dbc-gold-gradient text-navy-950 font-extrabold text-xs shadow-lg hover:opacity-95 transition flex items-center justify-center gap-2"
+                        >
+                          <UserPlus className="w-4 h-4" />
+                          {busyAction === "REGISTER_CUSTOMER"
+                            ? "Creating Account & Prepaid Wallet..."
+                            : "Create Account & Open Customer Dashboard"}
+                        </button>
+                      </form>
+                    )}
+                  </div>
+                ) : (
+                  <div className="rounded-2xl bg-gradient-to-br from-navy-900 via-navy-950 to-black p-6 border-2 border-gold-500/60 shadow-2xl space-y-4">
+                    <div className="flex items-center justify-between">
+                      <span className="px-3 py-1 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 text-xs font-bold">
+                        Active Session: {authUser.role.replace("_", " ")}
+                      </span>
+                      <span className="text-xs text-slate-400 font-mono">
+                        {authUser.email}
+                      </span>
+                    </div>
+                    <h3 className="text-xl font-black text-white">
+                      Welcome back, {authUser.fullName}
+                    </h3>
+                    <p className="text-xs text-slate-300 leading-relaxed">
+                      {isAdminSession
+                        ? "You are signed in with Admin privileges. You can manage Repayment Parameters, approve loans, create Team Member accounts in the Back Office, or inspect any Customer Wallet."
+                        : "You are signed in to your personal DB Capital Customer Account. Access your Prepaid Wallet, Loan Applications, Standing Orders, and Flutterwave Smart Cards."}
+                    </p>
+                    <div className="flex flex-col gap-2 pt-2">
+                      {isAdminSession ? (
+                        <>
+                          <button
+                            onClick={() => setPlatformMode("BACK_OFFICE")}
+                            className="w-full py-3 rounded-xl bg-dbc-gold-gradient text-navy-950 font-extrabold text-xs shadow"
+                          >
+                            Open Admin Back Office →
+                          </button>
+                          <button
+                            onClick={() => setPlatformMode("CUSTOMER_PORTAL")}
+                            className="w-full py-2.5 rounded-xl bg-white/10 hover:bg-white/15 text-white font-bold text-xs border border-white/20"
+                          >
+                            Inspect Customer Wallets →
+                          </button>
+                        </>
+                      ) : (
+                        <button
+                          onClick={() => setPlatformMode("CUSTOMER_PORTAL")}
+                          className="w-full py-3 rounded-xl bg-dbc-gold-gradient text-navy-950 font-extrabold text-xs shadow"
+                        >
+                          Open My Customer Dashboard →
+                        </button>
+                      )}
                     </div>
                   </div>
-                  <div className="w-12 h-9 rounded-md bg-gradient-to-br from-gold-300 to-gold-600 mb-5 border border-white/30" />
-                  <p className="font-mono text-xl sm:text-2xl tracking-widest text-gold-300 font-bold mb-4">
-                    5399 •••• •••• 8492
-                  </p>
-                  <div className="flex items-center justify-between text-xs text-slate-300 border-t border-white/10 pt-3">
-                    <div>
-                      <span className="text-[10px] text-slate-400 block">
-                        CARDHOLDER
-                      </span>
-                      <span className="font-bold text-white">
-                        {currentUser?.fullName?.toUpperCase()}
-                      </span>
-                    </div>
-                    <div>
-                      <span className="text-[10px] text-slate-400 block">
-                        FORM FACTOR
-                      </span>
-                      <span className="font-bold text-gold-400">
-                        VIRTUAL & PHYSICAL
-                      </span>
-                    </div>
-                    <div>
-                      <span className="text-[10px] text-slate-400 block">
-                        VALID THRU
-                      </span>
-                      <span className="font-bold text-white">08/29</span>
-                    </div>
-                  </div>
-                </div>
+                )}
               </div>
             </div>
           </section>
@@ -507,6 +1119,13 @@ export default function DBCapitalPlatformPage() {
                   </div>
                   <button
                     onClick={() => {
+                      if (!authUser) {
+                        setAuthMode("REGISTER");
+                        document
+                          .getElementById("auth-portal-card")
+                          ?.scrollIntoView({ behavior: "smooth" });
+                        return;
+                      }
                       setPlatformMode("CUSTOMER_PORTAL");
                       setPortalTab("OVERVIEW");
                       setShowFundModal(true);
@@ -533,6 +1152,13 @@ export default function DBCapitalPlatformPage() {
                   </div>
                   <button
                     onClick={() => {
+                      if (!authUser) {
+                        setAuthMode("REGISTER");
+                        document
+                          .getElementById("auth-portal-card")
+                          ?.scrollIntoView({ behavior: "smooth" });
+                        return;
+                      }
                       setPlatformMode("CUSTOMER_PORTAL");
                       setPortalTab("LOANS_AND_CREDIT");
                     }}
@@ -558,12 +1184,28 @@ export default function DBCapitalPlatformPage() {
                   </div>
                   <button
                     onClick={() => {
-                      setPlatformMode("BACK_OFFICE");
-                      setAdminTab("REPAYMENT_PARAMS");
+                      if (!authUser) {
+                        setAuthMode("LOGIN");
+                        setLoginEmail("superadmin@dbcapital.ng");
+                        setLoginPassword("Admin@123");
+                        document
+                          .getElementById("auth-portal-card")
+                          ?.scrollIntoView({ behavior: "smooth" });
+                        return;
+                      }
+                      if (isAdminSession) {
+                        setPlatformMode("BACK_OFFICE");
+                        setAdminTab("REPAYMENT_PARAMS");
+                      } else {
+                        setPlatformMode("CUSTOMER_PORTAL");
+                        setPortalTab("STANDING_ORDERS");
+                      }
                     }}
                     className="mt-4 text-xs font-bold text-navy-800 hover:text-gold-600 flex items-center gap-1"
                   >
-                    Configure Admin Parameters{" "}
+                    {isAdminSession
+                      ? "Configure Admin Parameters"
+                      : "View Standing Order Rules"}{" "}
                     <ArrowUpRight className="w-3.5 h-3.5" />
                   </button>
                 </div>
@@ -584,6 +1226,13 @@ export default function DBCapitalPlatformPage() {
                   </div>
                   <button
                     onClick={() => {
+                      if (!authUser) {
+                        setAuthMode("REGISTER");
+                        document
+                          .getElementById("auth-portal-card")
+                          ?.scrollIntoView({ behavior: "smooth" });
+                        return;
+                      }
                       setPlatformMode("CUSTOMER_PORTAL");
                       setPortalTab("SMART_CARDS");
                     }}
@@ -710,8 +1359,52 @@ export default function DBCapitalPlatformPage() {
       {/* ===================================================================== */}
       {/* VIEW 2: CUSTOMER WALLET, LOANS, STANDING ORDERS & SMART CARDS PORTAL  */}
       {/* ===================================================================== */}
-      {platformMode === "CUSTOMER_PORTAL" && (
+      {authUser && platformMode === "CUSTOMER_PORTAL" && (
         <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 py-6 space-y-6">
+          {/* Admin Customer Wallet Inspector Banner (Visible only to Super Admin / Team Members) */}
+          {isAdminSession && (
+            <div className="bg-navy-900 text-white rounded-2xl p-4 border border-gold-500/40 shadow-md flex flex-wrap items-center justify-between gap-4">
+              <div className="flex items-center gap-3">
+                <span className="px-2.5 py-1 rounded-full bg-gold-500 text-navy-950 font-black text-[10px] uppercase">
+                  Admin Customer Wallet Inspector
+                </span>
+                <p className="text-xs text-slate-300">
+                  Signed in as{" "}
+                  <strong className="text-gold-300">{authUser.fullName}</strong>{" "}
+                  ({authUser.role}). Inspecting{" "}
+                  <strong className="text-white">
+                    {currentUser?.fullName}&apos;s
+                  </strong>{" "}
+                  wallet & credit profile.
+                </p>
+              </div>
+              <div className="flex flex-wrap items-center gap-2">
+                <select
+                  value={selectedUserId}
+                  onChange={(e) => {
+                    const nextId = e.target.value;
+                    setSelectedUserId(nextId);
+                    fetchSnapshot(nextId);
+                  }}
+                  className="bg-navy-950 text-gold-300 text-xs font-bold px-3 py-1.5 rounded-lg border border-gold-500/40 focus:outline-none"
+                >
+                  {(snapshot?.users || []).map((u: any) => (
+                    <option key={u.id} value={u.id}>
+                      Switch Customer: {u.fullName} ({u.accountType})
+                    </option>
+                  ))}
+                </select>
+                <button
+                  type="button"
+                  onClick={() => setPlatformMode("BACK_OFFICE")}
+                  className="px-3 py-1.5 rounded-lg bg-dbc-gold-gradient text-navy-950 font-extrabold text-xs"
+                >
+                  ← Back to Admin Back Office
+                </button>
+              </div>
+            </div>
+          )}
+
           {/* Customer Profile & Sub-navigation */}
           <div className="bg-white rounded-2xl p-4 sm:p-5 border border-slate-200 shadow-sm flex flex-wrap items-center justify-between gap-4">
             <div className="flex items-center gap-3.5">
@@ -1170,15 +1863,21 @@ export default function DBCapitalPlatformPage() {
                                 Run Next Wallet Deduction Now
                               </button>
                             ) : loan.status === "UNDER_REVIEW" ? (
-                              <button
-                                onClick={() => {
-                                  setPlatformMode("BACK_OFFICE");
-                                  setAdminTab("LOAN_DISBURSEMENTS");
-                                }}
-                                className="text-xs font-bold text-gold-600 underline"
-                              >
-                                Approve & Disburse in Super Admin →
-                              </button>
+                              isAdminSession ? (
+                                <button
+                                  onClick={() => {
+                                    setPlatformMode("BACK_OFFICE");
+                                    setAdminTab("LOAN_DISBURSEMENTS");
+                                  }}
+                                  className="text-xs font-bold text-gold-600 underline"
+                                >
+                                  Approve & Disburse in Super Admin →
+                                </button>
+                              ) : (
+                                <span className="text-xs font-semibold text-amber-700 bg-amber-50 px-2.5 py-1 rounded-lg border border-amber-200">
+                                  Awaiting Super Admin Approval & Wallet Disbursement
+                                </span>
+                              )
                             ) : null}
                           </div>
                         )}
@@ -2099,21 +2798,24 @@ export default function DBCapitalPlatformPage() {
       {/* ===================================================================== */}
       {/* VIEW 3: SUPER ADMIN BACK OFFICE                                       */}
       {/* ===================================================================== */}
-      {platformMode === "BACK_OFFICE" && (
+      {authUser && isAdminSession && platformMode === "BACK_OFFICE" && (
         <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 py-6 space-y-6">
           {/* Admin Header & Navigation */}
           <div className="bg-dbc-navy-gradient text-white rounded-2xl p-5 border border-gold-500/40 shadow-lg flex flex-wrap items-center justify-between gap-4">
             <div>
               <div className="flex items-center gap-2">
                 <span className="px-2.5 py-0.5 rounded-full bg-gold-500 text-navy-950 font-black text-[10px] uppercase">
-                  Super Admin Back Office
+                  {authUser.role === "SUPER_ADMIN"
+                    ? "Super Admin Back Office"
+                    : "Admin & Team Operations Back Office"}
                 </span>
                 <span className="text-xs text-gold-300 font-semibold">
-                  Operate • Monitor • Report
+                  Operate • Monitor • Report • Inspect Customer Wallets
                 </span>
               </div>
               <h2 className="text-xl font-extrabold mt-1">
-                Credit Parameters, Wallet Disbursements & Standing Order Engine
+                Credit Parameters, Wallet Disbursements, Standing Orders & Team
+                Accounts
               </h2>
             </div>
 
@@ -2143,6 +2845,11 @@ export default function DBCapitalPlatformPage() {
                   id: "SYSTEM_LEDGER",
                   label: "5. Master Ledger",
                   icon: Server,
+                },
+                {
+                  id: "TEAM_MEMBERS",
+                  label: "6. Team & Staff Accounts",
+                  icon: Users,
                 },
               ].map((t) => {
                 const Icon = t.icon;
@@ -2868,6 +3575,283 @@ export default function DBCapitalPlatformPage() {
                     ))}
                   </tbody>
                 </table>
+              </div>
+            </div>
+          )}
+
+          {/* ADMIN TAB 6: SUPER ADMIN TEAM MEMBER MANAGEMENT & CUSTOMER WALLET SHORTCUTS */}
+          {adminTab === "TEAM_MEMBERS" && (
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+              {/* Left Column: Existing Team Members & Customer Wallet Inspector Directory */}
+              <div className="lg:col-span-7 space-y-6">
+                <div className="bg-white rounded-2xl p-6 border border-slate-200 shadow-sm space-y-4">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <h3 className="text-lg font-extrabold text-navy-900">
+                        Admin & Team Member Directory
+                      </h3>
+                      <p className="text-xs text-slate-500">
+                        All staff accounts below can sign in on the standalone
+                        frontend to access the Admin Dashboard and inspect
+                        customer wallets.
+                      </p>
+                    </div>
+                    <span className="px-3 py-1 rounded-full bg-navy-900 text-gold-400 font-bold text-xs">
+                      {(snapshot?.admin?.teamMembers || []).length} Active Staff
+                    </span>
+                  </div>
+
+                  <div className="space-y-3">
+                    {(snapshot?.admin?.teamMembers || []).map((member: any) => (
+                      <div
+                        key={member.id}
+                        className="p-4 rounded-xl border border-slate-200 bg-slate-50 flex flex-wrap items-center justify-between gap-3"
+                      >
+                        <div className="flex items-center gap-3">
+                          <div className="w-10 h-10 rounded-xl bg-navy-900 text-gold-400 font-black text-sm flex items-center justify-center">
+                            {member.fullName?.slice(0, 2).toUpperCase()}
+                          </div>
+                          <div>
+                            <div className="flex items-center gap-2">
+                              <h4 className="font-bold text-sm text-navy-900">
+                                {member.fullName}
+                              </h4>
+                              <span
+                                className={`text-[10px] font-black px-2 py-0.5 rounded-full uppercase ${
+                                  member.role === "SUPER_ADMIN"
+                                    ? "bg-gold-500 text-navy-950"
+                                    : member.role === "ADMIN"
+                                    ? "bg-navy-900 text-gold-400"
+                                    : "bg-emerald-100 text-emerald-800"
+                                }`}
+                              >
+                                {member.role.replace("_", " ")}
+                              </span>
+                            </div>
+                            <p className="text-xs text-slate-500 font-mono mt-0.5">
+                              {member.email} • {member.phone}
+                            </p>
+                            {member.department && (
+                              <p className="text-[11px] text-slate-600 font-semibold mt-0.5">
+                                Department: {member.department}
+                              </p>
+                            )}
+                          </div>
+                        </div>
+                        <span className="text-[11px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2.5 py-1 rounded-lg">
+                          Admin Portal Enabled
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Quick Customer Wallet Inspector List */}
+                <div className="bg-white rounded-2xl p-6 border border-slate-200 shadow-sm space-y-4">
+                  <div>
+                    <h3 className="text-base font-extrabold text-navy-900">
+                      Customer Wallet Inspector Directory
+                    </h3>
+                    <p className="text-xs text-slate-500">
+                      Select any registered customer below to open and inspect
+                      their Prepaid Wallet, Loan Applications, Standing Orders,
+                      and Smart Cards.
+                    </p>
+                  </div>
+                  <div className="space-y-2.5">
+                    {(snapshot?.users || []).map((cust: any) => (
+                      <div
+                        key={cust.id}
+                        className="p-3.5 rounded-xl border border-slate-200 bg-slate-50 flex flex-wrap items-center justify-between gap-3"
+                      >
+                        <div>
+                          <div className="flex items-center gap-2">
+                            <span className="font-bold text-sm text-navy-900">
+                              {cust.fullName}
+                            </span>
+                            <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-slate-200 text-slate-700">
+                              {cust.accountType}
+                            </span>
+                          </div>
+                          <p className="text-xs text-slate-500 font-mono">
+                            {cust.email} • {cust.phone}
+                          </p>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setSelectedUserId(cust.id);
+                            fetchSnapshot(cust.id);
+                            setPlatformMode("CUSTOMER_PORTAL");
+                            setPortalTab("OVERVIEW");
+                          }}
+                          className="px-3.5 py-2 rounded-xl bg-navy-900 hover:bg-navy-800 text-gold-400 font-bold text-xs flex items-center gap-1.5"
+                        >
+                          <Wallet className="w-3.5 h-3.5" />
+                          Inspect Customer Wallet →
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+
+              {/* Right Column: Super Admin Create Team Member Account Form */}
+              <div className="lg:col-span-5 bg-white rounded-2xl p-6 border border-slate-200 shadow-sm space-y-4 h-fit">
+                <div>
+                  <span className="text-xs font-bold uppercase tracking-wider text-gold-600">
+                    Super Admin Access Control
+                  </span>
+                  <h3 className="text-lg font-extrabold text-navy-900">
+                    Create Account for Team Member
+                  </h3>
+                  <p className="text-xs text-slate-500 mt-0.5">
+                    Provision login credentials for team members (`TEAM_MEMBER`,
+                    `ADMIN`, or `SUPER_ADMIN`). They can log in directly on the
+                    frontend to access the Admin Dashboard.
+                  </p>
+                </div>
+
+                {authUser.role !== "SUPER_ADMIN" &&
+                authUser.role !== "ADMIN" ? (
+                  <div className="p-4 rounded-xl bg-amber-50 border border-amber-200 text-xs text-amber-800 space-y-1">
+                    <p className="font-bold">
+                      Super Admin Permission Required
+                    </p>
+                    <p>
+                      You are currently signed in as a{" "}
+                      <strong>{authUser.role}</strong>. Only a{" "}
+                      <strong>SUPER_ADMIN</strong> or <strong>ADMIN</strong> can
+                      provision new team member accounts.
+                    </p>
+                  </div>
+                ) : (
+                  <div className="space-y-3 text-xs">
+                    <div>
+                      <label className="font-bold text-slate-700 block mb-1">
+                        Team Member Full Name *
+                      </label>
+                      <input
+                        type="text"
+                        value={staffFullName}
+                        onChange={(e) => setStaffFullName(e.target.value)}
+                        placeholder="e.g. Segun Obasanjo"
+                        className="w-full px-3 py-2.5 rounded-xl border border-slate-300 font-semibold text-navy-900"
+                      />
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <div>
+                        <label className="font-bold text-slate-700 block mb-1">
+                          Official Email Address *
+                        </label>
+                        <input
+                          type="email"
+                          value={staffEmail}
+                          onChange={(e) => setStaffEmail(e.target.value)}
+                          placeholder="segun@dbcapital.ng"
+                          className="w-full px-3 py-2.5 rounded-xl border border-slate-300 font-semibold text-navy-900"
+                        />
+                      </div>
+                      <div>
+                        <label className="font-bold text-slate-700 block mb-1">
+                          Phone Number *
+                        </label>
+                        <input
+                          type="tel"
+                          value={staffPhone}
+                          onChange={(e) => setStaffPhone(e.target.value)}
+                          placeholder="+234 809 000 0000"
+                          className="w-full px-3 py-2.5 rounded-xl border border-slate-300 font-semibold text-navy-900"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <div>
+                        <label className="font-bold text-slate-700 block mb-1">
+                          Assigned Role *
+                        </label>
+                        <select
+                          value={staffRole}
+                          onChange={(e) =>
+                            setStaffRole(
+                              e.target.value as
+                                | "TEAM_MEMBER"
+                                | "ADMIN"
+                                | "SUPER_ADMIN"
+                            )
+                          }
+                          className="w-full px-3 py-2.5 rounded-xl border border-slate-300 font-bold text-navy-900"
+                        >
+                          <option value="TEAM_MEMBER">
+                            TEAM_MEMBER (Operations)
+                          </option>
+                          <option value="ADMIN">ADMIN (Manager)</option>
+                          <option value="SUPER_ADMIN">
+                            SUPER_ADMIN (Executive)
+                          </option>
+                        </select>
+                      </div>
+                      <div>
+                        <label className="font-bold text-slate-700 block mb-1">
+                          Department / Unit *
+                        </label>
+                        <input
+                          type="text"
+                          value={staffDepartment}
+                          onChange={(e) => setStaffDepartment(e.target.value)}
+                          placeholder="Credit & Risk Operations"
+                          className="w-full px-3 py-2.5 rounded-xl border border-slate-300 font-semibold text-navy-900"
+                        />
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="font-bold text-slate-700 block mb-1">
+                        Temporary Login Password *
+                      </label>
+                      <input
+                        type="text"
+                        value={staffPassword}
+                        onChange={(e) => setStaffPassword(e.target.value)}
+                        placeholder="Staff@123"
+                        className="w-full px-3 py-2.5 rounded-xl border border-slate-300 font-mono font-bold text-navy-900"
+                      />
+                    </div>
+
+                    <button
+                      type="button"
+                      disabled={busyAction === "CREATE_TEAM_MEMBER"}
+                      onClick={async () => {
+                        const res = await runPlatformAction(
+                          "CREATE_TEAM_MEMBER",
+                          {
+                            creatorUserId: authUser.id,
+                            fullName: staffFullName,
+                            email: staffEmail,
+                            phone: staffPhone,
+                            password: staffPassword,
+                            role: staffRole,
+                            department: staffDepartment,
+                          },
+                          `Created ${staffRole} account for ${staffFullName} (${staffEmail})! They can now log in on the frontend.`
+                        );
+                        if (res) {
+                          setStaffFullName("");
+                          setStaffEmail("");
+                          setStaffPhone("");
+                        }
+                      }}
+                      className="w-full py-3 rounded-xl bg-dbc-gold-gradient text-navy-950 font-extrabold text-xs shadow-lg hover:opacity-95 transition flex items-center justify-center gap-2"
+                    >
+                      <UserPlus className="w-4 h-4" />
+                      {busyAction === "CREATE_TEAM_MEMBER"
+                        ? "Creating Team Member Account..."
+                        : "Create Team Member Account"}
+                    </button>
+                  </div>
+                )}
               </div>
             </div>
           )}

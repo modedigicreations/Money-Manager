@@ -13,9 +13,11 @@ datasource db {
 model User {
   id                 String            @id @default(cuid())
   email              String            @unique
+  passwordHash       String
   fullName           String
   phone              String
-  role               String            @default("CUSTOMER") // CUSTOMER | ADMIN | SUPER_ADMIN
+  role               String            @default("CUSTOMER") // CUSTOMER | TEAM_MEMBER | ADMIN | SUPER_ADMIN
+  department         String?           // Executive | Credit & Risk | Card Operations | Treasury
   accountType        String            @default("INDIVIDUAL") // INDIVIDUAL | BUSINESS
   businessName       String?
   rcNumber           String?

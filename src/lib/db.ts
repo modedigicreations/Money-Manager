@@ -22,6 +22,31 @@ function uniqueSuffix(): string {
   return `${Date.now().toString().slice(-5)}${seqCounter}${rand}`;
 }
 
+export function hashPassword(password: string): string {
+  return crypto
+    .createHash("sha256")
+    .update(`dbc_salt_2026_${password}`)
+    .digest("hex");
+}
+
+function sanitizeUser(u: Record<string, unknown> | undefined) {
+  if (!u) return null;
+  const copy = { ...u };
+  delete copy.passwordHash;
+  return copy;
+}
+
+function generateVirtualAccountNumber(db: DatabaseSync): string {
+  for (let attempt = 0; attempt < 20; attempt++) {
+    const candidate = `782${Math.floor(1000000 + Math.random() * 8999999)}`;
+    const exists = db
+      .prepare("SELECT id FROM Wallet WHERE accountNumber = ?")
+      .get(candidate);
+    if (!exists) return candidate;
+  }
+  return `782${Date.now().toString().slice(-7)}`;
+}
+
 function withTransaction<T>(db: DatabaseSync, fn: () => T): T {
   db.exec("BEGIN IMMEDIATE;");
   try {
@@ -50,9 +75,11 @@ function initializeSchemaAndSeed(db: DatabaseSync) {
     CREATE TABLE IF NOT EXISTS User (
       id TEXT PRIMARY KEY,
       email TEXT UNIQUE NOT NULL,
+      passwordHash TEXT NOT NULL DEFAULT '',
       fullName TEXT NOT NULL,
       phone TEXT NOT NULL,
       role TEXT NOT NULL DEFAULT 'CUSTOMER',
+      department TEXT,
       accountType TEXT NOT NULL DEFAULT 'INDIVIDUAL',
       businessName TEXT,
       rcNumber TEXT,
@@ -223,27 +250,49 @@ function initializeSchemaAndSeed(db: DatabaseSync) {
     );
   }
 
+  // Ensure passwordHash and department columns exist on User if migrating an older dev.db
+  const userCols = db.prepare("PRAGMA table_info(User)").all() as Array<{
+    name: string;
+  }>;
+  if (!userCols.some((c) => c.name === "passwordHash")) {
+    db.exec(
+      "ALTER TABLE User ADD COLUMN passwordHash TEXT NOT NULL DEFAULT '';"
+    );
+  }
+  if (!userCols.some((c) => c.name === "department")) {
+    db.exec("ALTER TABLE User ADD COLUMN department TEXT;");
+  }
+
   const countRow = db
     .prepare("SELECT COUNT(*) as cnt FROM User")
     .get() as { cnt: number };
   if (countRow.cnt > 0) {
+    // Backfill default password hashes if any existing row has empty passwordHash
+    db.prepare(
+      "UPDATE User SET passwordHash = ?, department = COALESCE(department, 'Executive & Risk Governance') WHERE role = 'SUPER_ADMIN' AND (passwordHash = '' OR passwordHash IS NULL)"
+    ).run(hashPassword("Admin@123"));
+    db.prepare(
+      "UPDATE User SET passwordHash = ? WHERE role = 'CUSTOMER' AND (passwordHash = '' OR passwordHash IS NULL)"
+    ).run(hashPassword("Customer@123"));
     return;
   }
 
   const now = new Date("2026-11-06T09:00:00Z").toISOString();
 
-  // 1. Seed Users (2 Customers: 1 Individual, 1 SME Business + 1 Super Admin)
+  // 1. Seed Users (2 Customers: 1 Individual, 1 SME Business + 1 Super Admin + 1 Team Member)
   const insertUser = db.prepare(`
-    INSERT INTO User (id, email, fullName, phone, role, accountType, businessName, rcNumber, bvn, nin, kycStatus, kycTier, creditScore, createdAt)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    INSERT INTO User (id, email, passwordHash, fullName, phone, role, department, accountType, businessName, rcNumber, bvn, nin, kycStatus, kycTier, creditScore, createdAt)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `);
 
   insertUser.run(
     "usr_adaeze",
     "adaeze.okafor@dbcapital.ng",
+    hashPassword("Customer@123"),
     "Adaeze Okafor",
     "+234 803 451 9920",
     "CUSTOMER",
+    null,
     "INDIVIDUAL",
     null,
     null,
@@ -258,9 +307,11 @@ function initializeSchemaAndSeed(db: DatabaseSync) {
   insertUser.run(
     "usr_tunde_biz",
     "tunde@lagostradelink.ng",
+    hashPassword("Customer@123"),
     "Tunde Balogun",
     "+234 809 220 7145",
     "CUSTOMER",
+    null,
     "BUSINESS",
     "Lagos TradeLink Logistics Ltd",
     "RC-1894021",
@@ -275,9 +326,11 @@ function initializeSchemaAndSeed(db: DatabaseSync) {
   insertUser.run(
     "usr_superadmin",
     "superadmin@dbcapital.ng",
-    "Chukwuma Nwosu (Chief Risk & Super Admin)",
+    hashPassword("Admin@123"),
+    "Chukwuma Nwosu",
     "+234 802 100 0001",
     "SUPER_ADMIN",
+    "Executive & Risk Governance",
     "BUSINESS",
     "DB Capital Credit and Loan HQ",
     "RC-1000001",
@@ -286,6 +339,25 @@ function initializeSchemaAndSeed(db: DatabaseSync) {
     "VERIFIED",
     3,
     850,
+    now
+  );
+
+  insertUser.run(
+    "usr_staff_funke",
+    "funke.adebayo@dbcapital.ng",
+    hashPassword("Staff@123"),
+    "Funke Adebayo",
+    "+234 805 319 4402",
+    "TEAM_MEMBER",
+    "Credit & Underwriting Operations",
+    "BUSINESS",
+    "DB Capital Credit and Loan HQ",
+    "RC-1000001",
+    "22100000002",
+    "50000000002",
+    "VERIFIED",
+    3,
+    820,
     now
   );
 
@@ -740,10 +812,18 @@ function initializeSchemaAndSeed(db: DatabaseSync) {
 export function getPlatformSnapshot(selectedUserId = "usr_adaeze") {
   const db = getDb();
 
-  const users = db.prepare("SELECT * FROM User ORDER BY createdAt ASC").all();
+  const rawUsers = db
+    .prepare("SELECT * FROM User ORDER BY createdAt ASC")
+    .all() as Array<Record<string, unknown>>;
+  const users = rawUsers.map((u) => sanitizeUser(u)!);
+  const customerUsers = users.filter((u) => u.role === "CUSTOMER");
+  const teamMembers = users.filter((u) => u.role !== "CUSTOMER");
+
+  const requestedUser = rawUsers.find((u) => u.id === selectedUserId);
   const currentUser =
-    db.prepare("SELECT * FROM User WHERE id = ?").get(selectedUserId) ||
-    users[0];
+    requestedUser && requestedUser.role === "CUSTOMER"
+      ? sanitizeUser(requestedUser)!
+      : customerUsers[0];
 
   const wallet = db
     .prepare("SELECT * FROM Wallet WHERE userId = ?")
@@ -905,7 +985,201 @@ export function getPlatformSnapshot(selectedUserId = "usr_adaeze") {
       allCards,
       allTransactions,
       allWallets,
+      teamMembers,
     },
+  };
+}
+
+/**
+ * 0A. Authenticate User (Customer OR Super Admin / Team Member)
+ */
+export function authenticateUser(params: { email: string; password: string }) {
+  const db = getDb();
+  const email = (params.email || "").trim().toLowerCase();
+  const password = params.password || "";
+  if (!email || !password) {
+    throw new Error("Please enter both your email address and password.");
+  }
+
+  const user = db
+    .prepare("SELECT * FROM User WHERE LOWER(email) = ?")
+    .get(email) as Record<string, unknown> | undefined;
+
+  if (!user || user.passwordHash !== hashPassword(password)) {
+    throw new Error("Invalid email address or password.");
+  }
+
+  const cleanUser = sanitizeUser(user)!;
+  const dashboardRoute =
+    cleanUser.role === "CUSTOMER" ? "CUSTOMER_DASHBOARD" : "ADMIN_DASHBOARD";
+
+  return {
+    user: cleanUser,
+    dashboardRoute,
+  };
+}
+
+/**
+ * 0B. Standalone Customer Registration (Creates Customer + Provisions Prepaid Wallet)
+ */
+export function registerCustomerAccount(params: {
+  fullName: string;
+  email: string;
+  phone: string;
+  password: string;
+  accountType: "INDIVIDUAL" | "BUSINESS";
+  businessName?: string;
+  rcNumber?: string;
+  bvn?: string;
+  nin?: string;
+}) {
+  const db = getDb();
+  const fullName = (params.fullName || "").trim();
+  const email = (params.email || "").trim().toLowerCase();
+  const phone = (params.phone || "").trim();
+  const password = params.password || "";
+  const accountType =
+    params.accountType === "BUSINESS" ? "BUSINESS" : "INDIVIDUAL";
+
+  if (!fullName || !email || !phone || !password) {
+    throw new Error(
+      "Full name, email address, phone number, and password are required."
+    );
+  }
+  if (password.length < 6) {
+    throw new Error("Password must be at least 6 characters long.");
+  }
+  if (accountType === "BUSINESS" && !(params.businessName || "").trim()) {
+    throw new Error("Business name is required for Business accounts.");
+  }
+
+  const existing = db
+    .prepare("SELECT id FROM User WHERE LOWER(email) = ?")
+    .get(email);
+  if (existing) {
+    throw new Error("An account with this email address already exists.");
+  }
+
+  return withTransaction(db, () => {
+    const now = new Date().toISOString();
+    const suffix = uniqueSuffix();
+    const userId = `usr_${suffix}`;
+    const walletId = `wal_${suffix}`;
+    const accountNumber = generateVirtualAccountNumber(db);
+
+    db.prepare(
+      `INSERT INTO User (
+        id, email, passwordHash, fullName, phone, role, department, accountType,
+        businessName, rcNumber, bvn, nin, kycStatus, kycTier, creditScore, createdAt
+      ) VALUES (?, ?, ?, ?, ?, 'CUSTOMER', NULL, ?, ?, ?, ?, ?, 'VERIFIED', 2, 725, ?)`
+    ).run(
+      userId,
+      email,
+      hashPassword(password),
+      fullName,
+      phone,
+      accountType,
+      accountType === "BUSINESS" ? (params.businessName || "").trim() : null,
+      accountType === "BUSINESS" ? (params.rcNumber || "").trim() || null : null,
+      (params.bvn || "").trim() || "22901847210",
+      (params.nin || "").trim() || "51092847165",
+      now
+    );
+
+    db.prepare(
+      `INSERT INTO Wallet (
+        id, userId, accountNumber, bankName, currency, balance, lockedBalance, status, updatedAt
+      ) VALUES (?, ?, ?, 'DB Capital / Flutterwave Wema Virtual', 'NGN', 0, 0, 'ACTIVE', ?)`
+    ).run(walletId, userId, accountNumber, now);
+
+    const createdUser = db
+      .prepare("SELECT * FROM User WHERE id = ?")
+      .get(userId) as Record<string, unknown>;
+
+    return {
+      user: sanitizeUser(createdUser)!,
+      walletAccountNumber: accountNumber,
+      dashboardRoute: "CUSTOMER_DASHBOARD" as const,
+    };
+  });
+}
+
+/**
+ * 0C. Super Admin: Create Account for Team Members / Staff
+ */
+export function createTeamMemberAccount(params: {
+  creatorUserId: string;
+  fullName: string;
+  email: string;
+  phone: string;
+  password: string;
+  role: "SUPER_ADMIN" | "ADMIN" | "TEAM_MEMBER";
+  department: string;
+}) {
+  const db = getDb();
+  const creator = db
+    .prepare("SELECT * FROM User WHERE id = ?")
+    .get(params.creatorUserId) as Record<string, unknown> | undefined;
+
+  if (
+    !creator ||
+    (creator.role !== "SUPER_ADMIN" && creator.role !== "ADMIN")
+  ) {
+    throw new Error(
+      "Only a Super Admin or Admin can create team member accounts."
+    );
+  }
+
+  const fullName = (params.fullName || "").trim();
+  const email = (params.email || "").trim().toLowerCase();
+  const phone = (params.phone || "").trim();
+  const password = params.password || "";
+  const department = (params.department || "Credit & Operations").trim();
+  const role = ["SUPER_ADMIN", "ADMIN", "TEAM_MEMBER"].includes(params.role)
+    ? params.role
+    : "TEAM_MEMBER";
+
+  if (!fullName || !email || !phone || !password) {
+    throw new Error(
+      "Full name, official email, phone number, and password are required."
+    );
+  }
+  if (password.length < 6) {
+    throw new Error("Team member password must be at least 6 characters.");
+  }
+
+  const existing = db
+    .prepare("SELECT id FROM User WHERE LOWER(email) = ?")
+    .get(email);
+  if (existing) {
+    throw new Error("A user with this email address already exists.");
+  }
+
+  const now = new Date().toISOString();
+  const userId = `usr_staff_${uniqueSuffix()}`;
+
+  db.prepare(
+    `INSERT INTO User (
+      id, email, passwordHash, fullName, phone, role, department, accountType,
+      businessName, rcNumber, bvn, nin, kycStatus, kycTier, creditScore, createdAt
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, 'BUSINESS', 'DB Capital Credit and Loan HQ', 'RC-1000001', NULL, NULL, 'VERIFIED', 3, 850, ?)`
+  ).run(
+    userId,
+    email,
+    hashPassword(password),
+    fullName,
+    phone,
+    role,
+    department,
+    now
+  );
+
+  const created = db
+    .prepare("SELECT * FROM User WHERE id = ?")
+    .get(userId) as Record<string, unknown>;
+
+  return {
+    teamMember: sanitizeUser(created)!,
   };
 }
 
