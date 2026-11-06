@@ -188,6 +188,77 @@ export default function DBCapitalPlatformPage() {
     } catch {
       // ignore storage errors
     }
+
+    // Automatically verify live payment callbacks returning from Paystack or Flutterwave checkout
+    try {
+      const params = new URLSearchParams(window.location.search);
+      const paymentProvider = (
+        params.get("payment_provider") || ""
+      ).toUpperCase();
+      const reference =
+        params.get("reference") ||
+        params.get("trxref") ||
+        params.get("tx_ref") ||
+        params.get("payment_ref");
+      const transactionId = params.get("transaction_id") || undefined;
+      const flwStatus = params.get("status");
+
+      if (
+        reference &&
+        (paymentProvider === "PAYSTACK" ||
+          paymentProvider === "FLUTTERWAVE" ||
+          params.has("trxref") ||
+          params.has("tx_ref"))
+      ) {
+        const resolvedProvider =
+          paymentProvider === "FLUTTERWAVE" || params.has("tx_ref")
+            ? "FLUTTERWAVE"
+            : "PAYSTACK";
+
+        // Clean URL query parameters immediately so refreshes don't re-trigger
+        window.history.replaceState({}, "", window.location.pathname);
+
+        if (flwStatus && flwStatus !== "successful" && flwStatus !== "completed") {
+          setBanner({
+            type: "error",
+            text: `Payment (${reference}) was not completed (${flwStatus}).`,
+          });
+          return;
+        }
+
+        fetch("/api/platform", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            action: "VERIFY_WALLET_PAYMENT",
+            payload: {
+              provider: resolvedProvider,
+              reference,
+              transactionId,
+            },
+          }),
+        })
+          .then((r) => r.json())
+          .then((json) => {
+            if (json.ok && json.data) {
+              setSnapshot(json.data);
+              setBanner({
+                type: "success",
+                text: `Wallet funding confirmed! Credited ₦${Number(
+                  json.result?.amountCredited || 0
+                ).toLocaleString("en-NG")} (Ref: ${reference}).`,
+              });
+            } else if (json.error) {
+              setBanner({ type: "error", text: json.error });
+            }
+          })
+          .catch(() => {
+            // ignore callback network errors
+          });
+      }
+    } catch {
+      // ignore URL parsing errors
+    }
   }, []);
 
   useEffect(() => {
@@ -1543,7 +1614,19 @@ export default function DBCapitalPlatformPage() {
                           fundAmount
                         )} (${fundChannel.replace("_", " ")})!`
                       );
-                      if (res) setShowFundModal(false);
+                      if (res) {
+                        setShowFundModal(false);
+                        if (
+                          res.status === "PENDING_REDIRECT" &&
+                          res.authorizationUrl
+                        ) {
+                          setBanner({
+                            type: "info",
+                            text: "Redirecting to secure payment checkout...",
+                          });
+                          window.location.href = res.authorizationUrl;
+                        }
+                      }
                     }}
                     className="px-5 py-2.5 rounded-xl bg-dbc-gold-gradient text-navy-950 font-extrabold text-xs shadow hover:opacity-95"
                   >

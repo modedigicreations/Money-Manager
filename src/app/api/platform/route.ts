@@ -5,6 +5,7 @@ import {
   registerCustomerAccount,
   createTeamMemberAccount,
   fundCustomerWallet,
+  verifyAndSettleLiveWalletPayment,
   upsertRepaymentParameter,
   applyForLoanWithStandingOrder,
   approveAndDisburseLoanToWallet,
@@ -56,6 +57,12 @@ export async function POST(req: NextRequest) {
         break;
       case "FUND_WALLET":
         result = await fundCustomerWallet(payload);
+        break;
+      case "VERIFY_WALLET_PAYMENT":
+        result = await verifyAndSettleLiveWalletPayment(payload);
+        if (result?.userId) {
+          targetSnapshotUserId = result.userId;
+        }
         break;
       case "UPSERT_REPAYMENT_PARAMETER":
         result = upsertRepaymentParameter(payload);

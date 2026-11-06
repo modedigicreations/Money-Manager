@@ -1191,12 +1191,13 @@ export function createTeamMemberAccount(params: {
 }
 
 /**
- * 1. Fund Prepaid Wallet via Flutterwave Gateway
+ * 1. Fund Prepaid Wallet via Paystack or Flutterwave (Live Checkout or Pre-Integration Settlement)
  */
 export async function fundCustomerWallet(params: {
   userId: string;
   amount: number;
   paymentChannel: "CARD" | "BANK_TRANSFER" | "USSD";
+  preferredProvider?: "AUTO" | "PAYSTACK" | "FLUTTERWAVE";
 }) {
   const db = getDb();
   const amount = Number(params.amount);
@@ -1224,7 +1225,50 @@ export async function fundCustomerWallet(params: {
     walletAccountNumber: wallet.accountNumber as string,
     amount,
     paymentChannel: params.paymentChannel,
+    preferredProvider: params.preferredProvider,
   });
+
+  // Live redirect checkout initialized (Paystack or Flutterwave)
+  if (gatewayRes.status === "pending" && gatewayRes.authorizationUrl) {
+    return withTransaction(db, () => {
+      const freshWallet = db
+        .prepare("SELECT * FROM Wallet WHERE id = ?")
+        .get(wallet.id as string) as Record<string, unknown>;
+      const balanceBefore = Number(freshWallet.balance);
+      const now = new Date().toISOString();
+      const txId = `tx_${uniqueSuffix()}`;
+      const txRef = `DBC-TX-WF-${uniqueSuffix()}`;
+
+      db.prepare(
+        `INSERT INTO LedgerTransaction (
+          id, walletId, reference, type, category, amount, balanceBefore, balanceAfter,
+          description, gatewayProvider, gatewayReference, status, metadataJson, createdAt
+        ) VALUES (?, ?, ?, 'CREDIT', 'WALLET_FUNDING', ?, ?, ?, ?, ?, ?, 'PENDING', ?, ?)`
+      ).run(
+        txId,
+        wallet.id as string,
+        txRef,
+        amount,
+        balanceBefore,
+        balanceBefore,
+        `Prepaid Wallet Funding (${params.paymentChannel.replace("_", " ")})`,
+        gatewayRes.gatewayProvider,
+        gatewayRes.gatewayReference,
+        JSON.stringify(gatewayRes.rawPayload),
+        now
+      );
+
+      return {
+        status: "PENDING_REDIRECT",
+        authorizationUrl: gatewayRes.authorizationUrl,
+        txReference: txRef,
+        gatewayReference: gatewayRes.gatewayReference,
+        balanceBefore,
+        balanceAfter: balanceBefore,
+        gatewayPayload: gatewayRes.rawPayload,
+      };
+    });
+  }
 
   return withTransaction(db, () => {
     const freshWallet = db
@@ -1262,12 +1306,187 @@ export async function fundCustomerWallet(params: {
     );
 
     return {
+      status: "SUCCESS",
       txReference: txRef,
       gatewayReference: gatewayRes.gatewayReference,
       balanceBefore,
       balanceAfter,
       gatewayPayload: gatewayRes.rawPayload,
     };
+  });
+}
+
+/**
+ * Idempotently confirm and credit a customer's Prepaid Wallet upon live payment webhook or callback verification
+ */
+export function confirmAndCreditWalletPayment(params: {
+  gatewayReference: string;
+  gatewayProvider: string;
+  amount: number;
+  channel?: string;
+  userId?: string;
+  walletAccountNumber?: string;
+  customerEmail?: string;
+  rawPayload?: Record<string, unknown>;
+}) {
+  const db = getDb();
+  const amount = Number(params.amount);
+  if (!Number.isFinite(amount) || amount <= 0) {
+    throw new Error("Verified payment amount must be greater than 0 NGN.");
+  }
+
+  return withTransaction(db, () => {
+    const existingTx = db
+      .prepare("SELECT * FROM LedgerTransaction WHERE gatewayReference = ?")
+      .get(params.gatewayReference) as Record<string, unknown> | undefined;
+
+    if (existingTx && existingTx.status === "SUCCESS") {
+      const existingWallet = db
+        .prepare("SELECT * FROM Wallet WHERE id = ?")
+        .get(existingTx.walletId as string) as Record<string, unknown>;
+      return {
+        alreadyProcessed: true,
+        userId: existingWallet?.userId as string,
+        txReference: existingTx.reference as string,
+        gatewayReference: params.gatewayReference,
+        amountCredited: Number(existingTx.amount),
+        balanceAfter: Number(existingWallet?.balance || existingTx.balanceAfter),
+      };
+    }
+
+    let wallet: Record<string, unknown> | undefined;
+    if (existingTx) {
+      wallet = db
+        .prepare("SELECT * FROM Wallet WHERE id = ?")
+        .get(existingTx.walletId as string) as Record<string, unknown> | undefined;
+    }
+    if (!wallet && params.walletAccountNumber) {
+      wallet = db
+        .prepare("SELECT * FROM Wallet WHERE accountNumber = ?")
+        .get(params.walletAccountNumber) as Record<string, unknown> | undefined;
+    }
+    if (!wallet && params.userId) {
+      wallet = db
+        .prepare("SELECT * FROM Wallet WHERE userId = ?")
+        .get(params.userId) as Record<string, unknown> | undefined;
+    }
+    if (!wallet && params.customerEmail) {
+      const u = db
+        .prepare("SELECT id FROM User WHERE LOWER(email) = LOWER(?)")
+        .get(params.customerEmail) as { id: string } | undefined;
+      if (u) {
+        wallet = db
+          .prepare("SELECT * FROM Wallet WHERE userId = ?")
+          .get(u.id) as Record<string, unknown> | undefined;
+      }
+    }
+
+    if (!wallet) {
+      throw new Error(
+        `Unable to locate target customer wallet for payment reference ${params.gatewayReference}.`
+      );
+    }
+
+    const balanceBefore = Number(wallet.balance);
+    const balanceAfter = balanceBefore + amount;
+    const now = new Date().toISOString();
+
+    db.prepare("UPDATE Wallet SET balance = ?, updatedAt = ? WHERE id = ?").run(
+      balanceAfter,
+      now,
+      wallet.id as string
+    );
+
+    if (existingTx) {
+      db.prepare(
+        `UPDATE LedgerTransaction
+         SET amount = ?, balanceBefore = ?, balanceAfter = ?, status = 'SUCCESS',
+             gatewayProvider = ?, metadataJson = ?
+         WHERE id = ?`
+      ).run(
+        amount,
+        balanceBefore,
+        balanceAfter,
+        params.gatewayProvider,
+        JSON.stringify(params.rawPayload || {}),
+        existingTx.id as string
+      );
+
+      return {
+        alreadyProcessed: false,
+        userId: wallet.userId as string,
+        txReference: existingTx.reference as string,
+        gatewayReference: params.gatewayReference,
+        amountCredited: amount,
+        balanceBefore,
+        balanceAfter,
+      };
+    }
+
+    const txId = `tx_${uniqueSuffix()}`;
+    const txRef = `DBC-TX-WF-${uniqueSuffix()}`;
+    const channelLabel = (params.channel || "BANK TRANSFER").replace("_", " ");
+
+    db.prepare(
+      `INSERT INTO LedgerTransaction (
+        id, walletId, reference, type, category, amount, balanceBefore, balanceAfter,
+        description, gatewayProvider, gatewayReference, status, metadataJson, createdAt
+      ) VALUES (?, ?, ?, 'CREDIT', 'WALLET_FUNDING', ?, ?, ?, ?, ?, ?, 'SUCCESS', ?, ?)`
+    ).run(
+      txId,
+      wallet.id as string,
+      txRef,
+      amount,
+      balanceBefore,
+      balanceAfter,
+      `Prepaid Wallet Funding (${channelLabel})`,
+      params.gatewayProvider,
+      params.gatewayReference,
+      JSON.stringify(params.rawPayload || {}),
+      now
+    );
+
+    return {
+      alreadyProcessed: false,
+      userId: wallet.userId as string,
+      txReference: txRef,
+      gatewayReference: params.gatewayReference,
+      amountCredited: amount,
+      balanceBefore,
+      balanceAfter,
+    };
+  });
+}
+
+/**
+ * Verify a live Paystack or Flutterwave payment via API and credit the customer's wallet
+ */
+export async function verifyAndSettleLiveWalletPayment(params: {
+  provider: "PAYSTACK" | "FLUTTERWAVE";
+  reference: string;
+  transactionId?: string;
+}) {
+  const verified = await flutterwaveGateway.verifyLiveWalletPayment({
+    provider: params.provider,
+    reference: params.reference,
+    transactionId: params.transactionId,
+  });
+
+  if (!verified.verified) {
+    throw new Error(
+      `Payment verification did not confirm a successful charge for reference ${params.reference}.`
+    );
+  }
+
+  return confirmAndCreditWalletPayment({
+    gatewayReference: verified.gatewayReference,
+    gatewayProvider: verified.gatewayProvider,
+    amount: verified.amountSettled,
+    channel: verified.channel,
+    userId: verified.userId,
+    walletAccountNumber: verified.walletAccountNumber,
+    customerEmail: verified.customerEmail,
+    rawPayload: verified.rawPayload,
   });
 }
 

@@ -15,6 +15,7 @@ const {
   registerCustomerAccount,
   createTeamMemberAccount,
   fundCustomerWallet,
+  confirmAndCreditWalletPayment,
   upsertRepaymentParameter,
   applyForLoanWithStandingOrder,
   approveAndDisburseLoanToWallet,
@@ -238,6 +239,44 @@ const teamLogin = authenticateUser({
 assert.equal(teamLogin.user.role, "TEAM_MEMBER");
 assert.equal(teamLogin.dashboardRoute, "ADMIN_DASHBOARD");
 console.log("✓ Customer registration, login separation, and Super Admin team member creation verified.");
+
+console.log("=== 11. Verifying Live Paystack & Flutterwave Webhook/Callback Settlement & Idempotency ===");
+const paystackRef = "PSK-LIVE-REF-900100";
+const settle1 = confirmAndCreditWalletPayment({
+  gatewayReference: paystackRef,
+  gatewayProvider: "PAYSTACK_LIVE",
+  amount: 75000,
+  channel: "BANK_TRANSFER",
+  userId: regRes.user.id,
+  walletAccountNumber: regRes.walletAccountNumber,
+  customerEmail: "ibrahim.musa@example.com",
+});
+assert.equal(settle1.alreadyProcessed, false);
+assert.equal(settle1.amountCredited, 75000);
+assert.equal(settle1.balanceAfter, 75000);
+
+// Replay same reference (webhook + callback idempotency check)
+const settle1Replay = confirmAndCreditWalletPayment({
+  gatewayReference: paystackRef,
+  gatewayProvider: "PAYSTACK_LIVE",
+  amount: 75000,
+  channel: "BANK_TRANSFER",
+  userId: regRes.user.id,
+});
+assert.equal(settle1Replay.alreadyProcessed, true);
+assert.equal(settle1Replay.balanceAfter, 75000);
+
+const flwRef = "FLW-LIVE-REF-900200";
+const settle2 = confirmAndCreditWalletPayment({
+  gatewayReference: flwRef,
+  gatewayProvider: "FLUTTERWAVE_LIVE",
+  amount: 25000,
+  channel: "CARD",
+  walletAccountNumber: regRes.walletAccountNumber,
+});
+assert.equal(settle2.alreadyProcessed, false);
+assert.equal(settle2.balanceAfter, 100000);
+console.log("✓ Live Paystack & Flutterwave payment settlement & idempotency verified.");
 
 // Clean up dev.db so the initial seed state is fresh for the application
 for (const ext of ["", "-wal", "-shm"]) {
