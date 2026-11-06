@@ -274,6 +274,13 @@ function initializeSchemaAndSeed(db: DatabaseSync) {
     db.prepare(
       "UPDATE User SET passwordHash = ? WHERE role = 'CUSTOMER' AND (passwordHash = '' OR passwordHash IS NULL)"
     ).run(hashPassword("Customer@123"));
+    // Normalize wallet bankName and customer-facing ledger descriptions if migrating an older DB
+    db.prepare(
+      "UPDATE Wallet SET bankName = 'DB Capital Commercial Bank' WHERE bankName LIKE '%Flutterwave%'"
+    ).run();
+    db.prepare(
+      "UPDATE LedgerTransaction SET description = REPLACE(description, 'via Flutterwave Gateway ', ''), description = REPLACE(description, 'via Flutterwave ', 'via '), description = REPLACE(description, 'Flutterwave ', 'DB Capital ') WHERE description LIKE '%Flutterwave%'"
+    ).run();
     return;
   }
 
@@ -373,7 +380,7 @@ function initializeSchemaAndSeed(db: DatabaseSync) {
     "wal_adaeze",
     "usr_adaeze",
     "7820194821",
-    "DB Capital / Flutterwave Wema Virtual",
+    "DB Capital Commercial Bank",
     425000,
     11050,
     now
@@ -383,7 +390,7 @@ function initializeSchemaAndSeed(db: DatabaseSync) {
     "wal_tunde",
     "usr_tunde_biz",
     "7820559104",
-    "DB Capital / Flutterwave Wema Virtual",
+    "DB Capital Commercial Bank",
     1850000,
     35400,
     now
@@ -661,9 +668,9 @@ function initializeSchemaAndSeed(db: DatabaseSync) {
     285500,
     0,
     285500,
-    "Prepaid Wallet Funding via Flutterwave Gateway (Bank Transfer)",
-    "FLUTTERWAVE_MOCK",
-    "FLW-DBC-WF-8829104",
+    "Prepaid Wallet Funding (Bank Transfer)",
+    "PAYMENT_BANK_TRANSFER",
+    "DBC-PAY-8829104",
     JSON.stringify({ channel: "BANK_TRANSFER" }),
     "2026-10-05T11:15:00Z"
   );
@@ -693,7 +700,7 @@ function initializeSchemaAndSeed(db: DatabaseSync) {
     50000,
     585500,
     535500,
-    "Flutterwave Virtual Smart Card Initial Funding (5399 **** **** 8492)",
+    "DB Capital Virtual Smart Card Initial Funding (5399 **** **** 8492)",
     "FLUTTERWAVE_MOCK",
     "FLW-CRD-8492",
     JSON.stringify({ cardType: "VIRTUAL" }),
@@ -710,8 +717,8 @@ function initializeSchemaAndSeed(db: DatabaseSync) {
     535500,
     425000,
     "Standing Order Repayment #1/3 — Mandate DBC-SO-MND-88412 (DBC-LN-2026-0891)",
-    "STANDING_ORDER_ENGINE",
-    "DBC-SO-MND-88412",
+    "FLUTTERWAVE_SO",
+    "FLW-SO-DBC-SO-MND-88412-1",
     JSON.stringify({ installment: 1, totalInstallments: 3 }),
     "2026-10-25T08:00:00Z"
   );
@@ -725,9 +732,9 @@ function initializeSchemaAndSeed(db: DatabaseSync) {
     1850000,
     0,
     1850000,
-    "Corporate Prepaid Wallet Funding via Flutterwave Gateway",
-    "FLUTTERWAVE_MOCK",
-    "FLW-DBC-WF-9918271",
+    "Corporate Prepaid Wallet Funding (Bank Transfer)",
+    "PAYMENT_BANK_TRANSFER",
+    "DBC-PAY-9918271",
     JSON.stringify({ channel: "BANK_TRANSFER" }),
     "2026-11-01T09:30:00Z"
   );
@@ -1089,7 +1096,7 @@ export function registerCustomerAccount(params: {
     db.prepare(
       `INSERT INTO Wallet (
         id, userId, accountNumber, bankName, currency, balance, lockedBalance, status, updatedAt
-      ) VALUES (?, ?, ?, 'DB Capital / Flutterwave Wema Virtual', 'NGN', 0, 0, 'ACTIVE', ?)`
+      ) VALUES (?, ?, ?, 'DB Capital Commercial Bank', 'NGN', 0, 0, 'ACTIVE', ?)`
     ).run(walletId, userId, accountNumber, now);
 
     const createdUser = db
@@ -1247,7 +1254,7 @@ export async function fundCustomerWallet(params: {
       amount,
       balanceBefore,
       balanceAfter,
-      `Prepaid Wallet Funding via Flutterwave (${params.paymentChannel})`,
+      `Prepaid Wallet Funding (${params.paymentChannel.replace("_", " ")})`,
       gatewayRes.gatewayProvider,
       gatewayRes.gatewayReference,
       JSON.stringify(gatewayRes.rawPayload),
@@ -1389,7 +1396,7 @@ export function applyForLoanWithStandingOrder(params: {
   const db = getDb();
   if (!params.standingOrderAuthorized) {
     throw new Error(
-      "You must authorize a Wallet Standing Order matching the Super Admin repayment parameters before submitting a loan/credit application."
+      "You must authorize a Wallet Standing Order matching the selected repayment terms before submitting a loan/credit application."
     );
   }
 
@@ -1423,7 +1430,7 @@ export function applyForLoanWithStandingOrder(params: {
 
   if (Number(user.creditScore) < Number(param.minCreditScore)) {
     throw new Error(
-      `Customer credit score (${user.creditScore}) is below the Super Admin minimum requirement (${param.minCreditScore}) for '${param.name}'.`
+      `Customer credit score (${user.creditScore}) is below the minimum requirement (${param.minCreditScore}) for '${param.name}'.`
     );
   }
 
@@ -1436,7 +1443,7 @@ export function applyForLoanWithStandingOrder(params: {
     throw new Error(
       `Principal amount must be between ₦${Number(
         param.minAmount
-      ).toLocaleString()} and ₦${Number(param.maxAmount).toLocaleString()} per Super Admin rules.`
+      ).toLocaleString()} and ₦${Number(param.maxAmount).toLocaleString()} for this credit facility.`
     );
   }
 
@@ -1450,7 +1457,7 @@ export function applyForLoanWithStandingOrder(params: {
   const baseInterestPortion = Math.floor(totalInterest / tenureCount);
   const installmentAmount = basePrincipalPortion + baseInterestPortion;
 
-  // Check Super Admin minimum wallet reserve requirement against available (spendable) balance
+  // Check minimum wallet reserve requirement against available (spendable) balance
   const minReserveRequired = Math.round(
     installmentAmount * (Number(param.minWalletReservePercent) / 100)
   );
@@ -1460,7 +1467,7 @@ export function applyForLoanWithStandingOrder(params: {
   );
   if (availableBalance < minReserveRequired) {
     throw new Error(
-      `Super Admin parameter '${
+      `Facility '${
         param.code
       }' requires at least ${param.minWalletReservePercent}% of one installment (₦${minReserveRequired.toLocaleString()}) in available (unlocked) wallet funds to activate the Standing Order. Available: ₦${availableBalance.toLocaleString()}.`
     );
@@ -1864,10 +1871,16 @@ export function executeStandingOrderDeduction(params: {
       };
     }
 
-    // Sufficient wallet funds -> Deduct from Wallet & record Standing Order repayment!
+    // Sufficient wallet funds -> Deduct from Wallet & record Standing Order repayment via backend Flutterwave engine!
     const balanceBefore = walletBalance;
     const balanceAfter = balanceBefore - amountDue;
     const txRef = `DBC-TX-SO-${suffix}`;
+    const flwSoRes = flutterwaveGateway.processStandingOrderRepayment({
+      mandateReference: so.mandateReference as string,
+      loanReference: loan.reference as string,
+      amount: amountDue,
+      installmentNumber,
+    });
 
     const newCompleted = Number(so.completedInstallments) + 1;
     const soStatus = newCompleted >= totalInst ? "COMPLETED" : "ACTIVE";
@@ -1888,7 +1901,7 @@ export function executeStandingOrderDeduction(params: {
       `INSERT INTO LedgerTransaction (
         id, walletId, reference, type, category, amount, balanceBefore, balanceAfter,
         description, gatewayProvider, gatewayReference, status, metadataJson, createdAt
-      ) VALUES (?, ?, ?, 'DEBIT', 'STANDING_ORDER_REPAYMENT', ?, ?, ?, ?, 'STANDING_ORDER_ENGINE', ?, 'SUCCESS', ?, ?)`
+      ) VALUES (?, ?, ?, 'DEBIT', 'STANDING_ORDER_REPAYMENT', ?, ?, ?, ?, ?, ?, 'SUCCESS', ?, ?)`
     ).run(
       `tx_${suffix}`,
       wallet.id as string,
@@ -1897,7 +1910,8 @@ export function executeStandingOrderDeduction(params: {
       balanceBefore,
       balanceAfter,
       `Standing Order Repayment #${installmentNumber}/${so.totalInstallments} — Mandate ${so.mandateReference} (${loan.reference})`,
-      so.mandateReference as string,
+      flwSoRes.gatewayProvider,
+      flwSoRes.gatewayReference,
       JSON.stringify({
         standingOrderId: so.id,
         loanReference: loan.reference,
@@ -1962,7 +1976,7 @@ export function executeStandingOrderDeduction(params: {
       txRef,
       `Successfully deducted ₦${amountDue.toLocaleString()} from Wallet ${
         wallet.accountNumber
-      } per Super Admin parameter ${so.parameterCode}.${
+      } (${so.parameterCode}).${
         releasedReserve > 0
           ? ` Released ₦${releasedReserve.toLocaleString()} Standing Order reserve.`
           : ""
@@ -2129,7 +2143,7 @@ export async function applyForSmartCard(params: {
       issuanceFee,
       balanceBefore,
       balanceAfterFee,
-      `Flutterwave ${params.cardType} ${params.cardBrand} Card Issuance Fee (${gatewayCard.maskedPan})`,
+      `DB Capital ${params.cardType} ${params.cardBrand} Card Issuance Fee (${gatewayCard.maskedPan})`,
       gatewayCard.gatewayProvider,
       gatewayCard.flutterwaveCardId,
       JSON.stringify({ cardType: params.cardType, issuanceFee }),
@@ -2152,7 +2166,7 @@ export async function applyForSmartCard(params: {
         initialFund,
         balanceAfterFee,
         balanceAfterAll,
-        `Flutterwave ${params.cardType} ${params.cardBrand} Initial Card Load (${gatewayCard.maskedPan})`,
+        `DB Capital ${params.cardType} ${params.cardBrand} Initial Card Load (${gatewayCard.maskedPan})`,
         gatewayCard.gatewayProvider,
         gatewayCard.flutterwaveCardId,
         JSON.stringify(gatewayCard.rawPayload),
@@ -2285,7 +2299,7 @@ export async function fundSmartCardFromWallet(params: {
       amount,
       balanceBefore,
       balanceAfter,
-      `Wallet to Flutterwave Smart Card Transfer (${card.maskedPan})`,
+      `Wallet to DB Capital Smart Card Transfer (${card.maskedPan})`,
       flwRes.gatewayProvider,
       flwRes.gatewayReference,
       JSON.stringify(flwRes.rawPayload),

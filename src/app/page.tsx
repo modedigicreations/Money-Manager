@@ -216,7 +216,7 @@ export default function DBCapitalPlatformPage() {
         setPortalTab("OVERVIEW");
         setBanner({
           type: "success",
-          text: `Welcome back, ${res.user.fullName}! Routed to your Customer Dashboard.`,
+          text: `Welcome back, ${res.user.fullName}!`,
         });
       } else {
         setPlatformMode("BACK_OFFICE");
@@ -226,7 +226,7 @@ export default function DBCapitalPlatformPage() {
           text: `Welcome back, ${res.user.fullName} (${res.user.role.replace(
             "_",
             " "
-          )})! Routed to the Admin Dashboard & Back Office.`,
+          )})!`,
         });
       }
     }
@@ -303,9 +303,9 @@ export default function DBCapitalPlatformPage() {
             json.result.usableBalance
           )}) is less than due installment (${formatNgn(
             json.result.amountAttempted
-          )}). Applied Super Admin late penalty (+${formatNgn(
+          )}). Applied late fee (+${formatNgn(
             json.result.penaltyApplied
-          )}). Customer must fund wallet.`,
+          )}). Please fund your wallet.`,
         });
       } else {
         setBanner({ type: "success", text: successMessage });
@@ -404,7 +404,7 @@ export default function DBCapitalPlatformPage() {
               <p className="text-xs text-slate-300">
                 Your Money. Your Credit. Your Growth. •{" "}
                 <span className="text-gold-400 font-medium">
-                  Flutterwave Pre-Integration Ready
+                  Wallets • Credit • Smart Cards
                 </span>
               </p>
             </div>
@@ -441,7 +441,7 @@ export default function DBCapitalPlatformPage() {
                 className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-dbc-gold-gradient text-navy-950 text-xs font-extrabold shadow"
               >
                 <UserPlus className="w-3.5 h-3.5" />
-                Create Customer Account
+                Create Account
               </button>
             </div>
           ) : isAdminSession ? (
@@ -604,7 +604,7 @@ export default function DBCapitalPlatformPage() {
       )}
 
       {/* ===================================================================== */}
-      {/* VIEW 1: STANDALONE FRONTEND, CUSTOMER SIGNUP & UNIFIED LOGIN PORTAL    */}
+      {/* VIEW 1: STANDALONE FRONTEND, CUSTOMER SIGNUP & LOGIN PORTAL           */}
       {/* ===================================================================== */}
       {(platformMode === "WEBSITE" || !authUser) && (
         <main className="flex-1">
@@ -614,7 +614,7 @@ export default function DBCapitalPlatformPage() {
               <div className="lg:col-span-7 space-y-5 pt-2">
                 <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-gold-500/20 border border-gold-400/40 text-gold-300 text-xs font-semibold">
                   <Sparkles className="w-3.5 h-3.5" />
-                  Build Once. Integrate Later. Deliver Excellence.
+                  Your Money. Your Credit. Your Growth.
                 </div>
                 <h1 className="text-3xl sm:text-5xl font-black tracking-tight leading-tight">
                   DB CAPITAL SMART{" "}
@@ -622,10 +622,10 @@ export default function DBCapitalPlatformPage() {
                 </h1>
                 <p className="text-slate-300 text-base sm:text-lg max-w-2xl leading-relaxed">
                   A unified digital financial platform with one smart card,
-                  prepaid wallets, personal loans, and business finance. Create
-                  your customer account to get an instant prepaid wallet, apply
-                  for credit disbursed straight to your wallet, and automate
-                  repayments via Standing Orders.
+                  prepaid wallets, personal loans, and business finance. Fund
+                  your wallet from any bank or payment channel, apply for credit
+                  disbursed straight to your wallet, and automate repayments via
+                  Standing Orders.
                 </p>
 
                 {!authUser ? (
@@ -641,7 +641,7 @@ export default function DBCapitalPlatformPage() {
                       className="px-5 py-3 rounded-xl bg-dbc-gold-gradient text-navy-950 font-bold text-sm shadow-lg hover:opacity-95 transition flex items-center gap-2"
                     >
                       <UserPlus className="w-4 h-4" />
-                      Create Customer Account
+                      Create Account
                     </button>
                     <button
                       type="button"
@@ -654,7 +654,7 @@ export default function DBCapitalPlatformPage() {
                       className="px-5 py-3 rounded-xl bg-white/10 hover:bg-white/15 border border-white/20 text-white font-semibold text-sm transition flex items-center gap-2"
                     >
                       <LogIn className="w-4 h-4" />
-                      Customer & Admin Sign In
+                      Sign In
                     </button>
                   </div>
                 ) : (
@@ -668,7 +668,7 @@ export default function DBCapitalPlatformPage() {
                     >
                       {isAdminSession
                         ? "Inspect Customer Wallet Portal"
-                        : "Go to My Customer Dashboard"}
+                        : "Go to My Dashboard"}
                       <ArrowUpRight className="w-4 h-4" />
                     </button>
                     {isAdminSession && (
@@ -691,7 +691,7 @@ export default function DBCapitalPlatformPage() {
                           DB CAPITAL SMART CARD & PREPAID WALLET
                         </p>
                         <p className="text-[10px] text-slate-400">
-                          Powered by Flutterwave Gateway • Virtual & Physical Cards
+                          Instant Virtual & Physical Cards • Multi-Channel Wallet
                         </p>
                       </div>
                       <div className="w-8 h-8 rounded-lg bg-dbc-gold-gradient flex items-center justify-center text-navy-950 font-black text-xs">
@@ -711,7 +711,7 @@ export default function DBCapitalPlatformPage() {
                 </div>
               </div>
 
-              {/* Right Column: Standalone Auth Portal (Sign In / Create Customer Account) */}
+              {/* Right Column: Standalone Auth Portal (Sign In / Create Account) */}
               <div className="lg:col-span-5" id="auth-portal-card">
                 {!authUser ? (
                   <div className="bg-white text-slate-900 rounded-2xl border-2 border-gold-500/70 shadow-2xl overflow-hidden">
@@ -727,7 +727,7 @@ export default function DBCapitalPlatformPage() {
                         }`}
                       >
                         <LogIn className="w-3.5 h-3.5" />
-                        Sign In (Customer / Admin)
+                        Sign In
                       </button>
                       <button
                         type="button"
@@ -739,7 +739,7 @@ export default function DBCapitalPlatformPage() {
                         }`}
                       >
                         <UserPlus className="w-3.5 h-3.5" />
-                        Create Customer Account
+                        Create Account
                       </button>
                     </div>
 
@@ -750,16 +750,14 @@ export default function DBCapitalPlatformPage() {
                       >
                         <div>
                           <span className="text-[11px] font-bold uppercase tracking-wider text-gold-600">
-                            Unified Frontend Portal
+                            DB Capital Online Banking
                           </span>
                           <h2 className="text-lg font-extrabold text-navy-900">
                             Sign In to Your Account
                           </h2>
                           <p className="text-xs text-slate-500 mt-0.5">
-                            Customers are routed to their{" "}
-                            <strong>Customer Dashboard</strong>. Super Admin &
-                            Team Members are routed to the{" "}
-                            <strong>Admin Dashboard</strong>.
+                            Enter your email address and password to access your
+                            DB Capital account.
                           </p>
                         </div>
 
@@ -801,80 +799,19 @@ export default function DBCapitalPlatformPage() {
                           <LogIn className="w-4 h-4" />
                           {busyAction === "LOGIN"
                             ? "Signing In..."
-                            : "Sign In to Dashboard"}
+                            : "Sign In to Account"}
                         </button>
 
-                        {/* Quick Demo Credentials Selector */}
-                        <div className="pt-3 border-t border-slate-200 space-y-2">
-                          <div className="flex items-center justify-between">
-                            <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500 flex items-center gap-1">
-                              <KeyRound className="w-3 h-3 text-gold-600" />
-                              Quick Demo Credentials (Click to Fill)
-                            </span>
-                          </div>
-                          <div className="grid grid-cols-2 gap-1.5 text-[11px]">
-                            <button
-                              type="button"
-                              onClick={() => {
-                                setLoginEmail("adaeze.okafor@dbcapital.ng");
-                                setLoginPassword("Customer@123");
-                              }}
-                              className="p-2 rounded-lg border border-slate-200 bg-slate-50 hover:bg-gold-50 hover:border-gold-400 text-left transition"
-                            >
-                              <span className="font-bold text-navy-900 block">
-                                Individual Customer
-                              </span>
-                              <span className="text-[10px] text-slate-500 font-mono">
-                                adaeze.okafor@dbcapital.ng
-                              </span>
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => {
-                                setLoginEmail("tunde@lagostradelink.ng");
-                                setLoginPassword("Customer@123");
-                              }}
-                              className="p-2 rounded-lg border border-slate-200 bg-slate-50 hover:bg-gold-50 hover:border-gold-400 text-left transition"
-                            >
-                              <span className="font-bold text-navy-900 block">
-                                Business Customer
-                              </span>
-                              <span className="text-[10px] text-slate-500 font-mono">
-                                tunde@lagostradelink.ng
-                              </span>
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => {
-                                setLoginEmail("superadmin@dbcapital.ng");
-                                setLoginPassword("Admin@123");
-                              }}
-                              className="p-2 rounded-lg border border-gold-400/60 bg-gold-50/60 hover:bg-gold-100 text-left transition"
-                            >
-                              <span className="font-bold text-navy-950 block">
-                                Super Admin Login
-                              </span>
-                              <span className="text-[10px] text-slate-600 font-mono">
-                                superadmin@dbcapital.ng
-                              </span>
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => {
-                                setLoginEmail("funke.adebayo@dbcapital.ng");
-                                setLoginPassword("Staff@123");
-                              }}
-                              className="p-2 rounded-lg border border-slate-200 bg-slate-50 hover:bg-gold-50 hover:border-gold-400 text-left transition"
-                            >
-                              <span className="font-bold text-navy-900 block">
-                                Team Member Login
-                              </span>
-                              <span className="text-[10px] text-slate-500 font-mono">
-                                funke.adebayo@dbcapital.ng
-                              </span>
-                            </button>
-                          </div>
-                        </div>
+                        <p className="text-center text-xs text-slate-500 pt-1">
+                          New to DB Capital?{" "}
+                          <button
+                            type="button"
+                            onClick={() => setAuthMode("REGISTER")}
+                            className="font-bold text-navy-900 hover:text-gold-600 underline"
+                          >
+                            Create an account
+                          </button>
+                        </p>
                       </form>
                     ) : (
                       <form
@@ -883,14 +820,14 @@ export default function DBCapitalPlatformPage() {
                       >
                         <div>
                           <span className="text-[11px] font-bold uppercase tracking-wider text-gold-600">
-                            Instant Customer Onboarding & Wallet
+                            Instant Account & Prepaid Wallet
                           </span>
                           <h2 className="text-lg font-extrabold text-navy-900">
-                            Create Your Customer Account
+                            Create Your Account
                           </h2>
                           <p className="text-xs text-slate-500 mt-0.5">
-                            Provisions your dedicated NGN Prepaid Wallet and
-                            takes you straight to your Customer Dashboard.
+                            Open your dedicated NGN Prepaid Wallet for personal
+                            loans, business finance, and Smart Cards.
                           </p>
                         </div>
 
@@ -965,7 +902,7 @@ export default function DBCapitalPlatformPage() {
                               required
                               value={regPassword}
                               onChange={(e) => setRegPassword(e.target.value)}
-                              placeholder="Min 4 characters"
+                              placeholder="Min 6 characters"
                               className="w-full px-3 py-2 rounded-lg border border-slate-300 font-semibold text-navy-900"
                             />
                           </div>
@@ -1040,7 +977,7 @@ export default function DBCapitalPlatformPage() {
                           <UserPlus className="w-4 h-4" />
                           {busyAction === "REGISTER_CUSTOMER"
                             ? "Creating Account & Prepaid Wallet..."
-                            : "Create Account & Open Customer Dashboard"}
+                            : "Create Account & Open Dashboard"}
                         </button>
                       </form>
                     )}
@@ -1049,7 +986,7 @@ export default function DBCapitalPlatformPage() {
                   <div className="rounded-2xl bg-gradient-to-br from-navy-900 via-navy-950 to-black p-6 border-2 border-gold-500/60 shadow-2xl space-y-4">
                     <div className="flex items-center justify-between">
                       <span className="px-3 py-1 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 text-xs font-bold">
-                        Active Session: {authUser.role.replace("_", " ")}
+                        Signed In
                       </span>
                       <span className="text-xs text-slate-400 font-mono">
                         {authUser.email}
@@ -1059,9 +996,9 @@ export default function DBCapitalPlatformPage() {
                       Welcome back, {authUser.fullName}
                     </h3>
                     <p className="text-xs text-slate-300 leading-relaxed">
-                      {isAdminSession
-                        ? "You are signed in with Admin privileges. You can manage Repayment Parameters, approve loans, create Team Member accounts in the Back Office, or inspect any Customer Wallet."
-                        : "You are signed in to your personal DB Capital Customer Account. Access your Prepaid Wallet, Loan Applications, Standing Orders, and Flutterwave Smart Cards."}
+                      Access your Prepaid Wallet, Loan & Credit facilities,
+                      automated Standing Orders, and Virtual or Physical Smart
+                      Cards.
                     </p>
                     <div className="flex flex-col gap-2 pt-2">
                       {isAdminSession ? (
@@ -1084,7 +1021,7 @@ export default function DBCapitalPlatformPage() {
                           onClick={() => setPlatformMode("CUSTOMER_PORTAL")}
                           className="w-full py-3 rounded-xl bg-dbc-gold-gradient text-navy-950 font-extrabold text-xs shadow"
                         >
-                          Open My Customer Dashboard →
+                          Open My Dashboard →
                         </button>
                       )}
                     </div>
@@ -1094,13 +1031,12 @@ export default function DBCapitalPlatformPage() {
             </div>
           </section>
 
-          {/* Core Products & System Architecture Grid matching the Infographic */}
-          <section className="max-w-7xl mx-auto px-4 sm:px-6 py-10 space-y-10">
-            {/* 4 Core Pillars */}
+          {/* Core Products & Financial Solutions */}
+          <section className="max-w-7xl mx-auto px-4 sm:px-6 py-10 space-y-8">
             <div>
               <h2 className="text-xl font-extrabold text-navy-900 mb-4 flex items-center gap-2">
                 <Layers className="w-5 h-5 text-gold-600" />
-                Core Products & End-to-End Financial Flows
+                Core Products & Financial Services
               </h2>
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5">
                 <div className="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm hover:border-gold-500 transition flex flex-col justify-between">
@@ -1112,9 +1048,10 @@ export default function DBCapitalPlatformPage() {
                       1. Prepaid Wallets
                     </h3>
                     <p className="text-xs text-slate-600 mt-1.5 leading-relaxed">
-                      Customers prepay and fund their dedicated wallet via the
-                      Flutterwave Gateway. Serves as the central hub for loan
-                      disbursements, standing order repayments, and card loads.
+                      Fund your dedicated DB Capital wallet seamlessly via Bank
+                      Transfer, Debit Card, or USSD from any bank or payment
+                      platform. Serves as your hub for credit disbursements and
+                      payments.
                     </p>
                   </div>
                   <button
@@ -1146,8 +1083,8 @@ export default function DBCapitalPlatformPage() {
                     </h3>
                     <p className="text-xs text-slate-600 mt-1.5 leading-relaxed">
                       Flexible access to personal credit. Approved loans are{" "}
-                      <strong>disbursed directly into the customer&apos;s wallet</strong>{" "}
-                      and repaid automatically via their Wallet Standing Order.
+                      <strong>disbursed directly into your wallet</strong> and
+                      repaid automatically via your scheduled Standing Order.
                     </p>
                   </div>
                   <button
@@ -1164,7 +1101,7 @@ export default function DBCapitalPlatformPage() {
                     }}
                     className="mt-4 text-xs font-bold text-navy-800 hover:text-gold-600 flex items-center gap-1"
                   >
-                    Apply via Wallet <ArrowUpRight className="w-3.5 h-3.5" />
+                    Apply for Credit <ArrowUpRight className="w-3.5 h-3.5" />
                   </button>
                 </div>
 
@@ -1177,36 +1114,26 @@ export default function DBCapitalPlatformPage() {
                       3. Business Finance & Standing Orders
                     </h3>
                     <p className="text-xs text-slate-600 mt-1.5 leading-relaxed">
-                      SME working capital governed by Super Admin repayment
-                      parameters (interest, tenure, frequency, reserve buffer,
-                      and automated standing order deductions).
+                      Working capital and asset financing tailored for growing
+                      businesses, paired with transparent repayment schedules
+                      and automated wallet Standing Orders.
                     </p>
                   </div>
                   <button
                     onClick={() => {
                       if (!authUser) {
-                        setAuthMode("LOGIN");
-                        setLoginEmail("superadmin@dbcapital.ng");
-                        setLoginPassword("Admin@123");
+                        setAuthMode("REGISTER");
                         document
                           .getElementById("auth-portal-card")
                           ?.scrollIntoView({ behavior: "smooth" });
                         return;
                       }
-                      if (isAdminSession) {
-                        setPlatformMode("BACK_OFFICE");
-                        setAdminTab("REPAYMENT_PARAMS");
-                      } else {
-                        setPlatformMode("CUSTOMER_PORTAL");
-                        setPortalTab("STANDING_ORDERS");
-                      }
+                      setPlatformMode("CUSTOMER_PORTAL");
+                      setPortalTab("STANDING_ORDERS");
                     }}
                     className="mt-4 text-xs font-bold text-navy-800 hover:text-gold-600 flex items-center gap-1"
                   >
-                    {isAdminSession
-                      ? "Configure Admin Parameters"
-                      : "View Standing Order Rules"}{" "}
-                    <ArrowUpRight className="w-3.5 h-3.5" />
+                    Set Up Standing Order <ArrowUpRight className="w-3.5 h-3.5" />
                   </button>
                 </div>
 
@@ -1216,12 +1143,12 @@ export default function DBCapitalPlatformPage() {
                       <CreditCard className="w-5 h-5" />
                     </div>
                     <h3 className="font-bold text-navy-900 text-base">
-                      4. Smart Card (Virtual & Physical)
+                      4. Smart Cards (Virtual & Physical)
                     </h3>
                     <p className="text-xs text-slate-600 mt-1.5 leading-relaxed">
-                      One card, multiple services. Issue instant Virtual or
-                      Physical cards powered by the Flutterwave Gateway, funded
-                      directly from the customer&apos;s wallet.
+                      One card, multiple services. Request instant Virtual or
+                      Physical Smart Cards linked directly to your DB Capital
+                      wallet for seamless online and in-store payments.
                     </p>
                   </div>
                   <button
@@ -1238,117 +1165,8 @@ export default function DBCapitalPlatformPage() {
                     }}
                     className="mt-4 text-xs font-bold text-navy-800 hover:text-gold-600 flex items-center gap-1"
                   >
-                    Manage Smart Cards <ArrowUpRight className="w-3.5 h-3.5" />
+                    Request Smart Card <ArrowUpRight className="w-3.5 h-3.5" />
                   </button>
-                </div>
-              </div>
-            </div>
-
-            {/* Interactive System Architecture Blueprint (Direct from the Infographic) */}
-            <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6">
-              <div className="flex flex-wrap items-center justify-between gap-4 mb-6">
-                <div>
-                  <span className="text-xs font-bold uppercase tracking-wider text-gold-600">
-                    System Architecture Blueprint
-                  </span>
-                  <h3 className="text-lg font-extrabold text-navy-900">
-                    Modular Shared Backend & Pre-Integration Flutterwave Gateway
-                  </h3>
-                </div>
-                <span className="text-xs px-3 py-1 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 font-semibold">
-                  Gateway Mode: {snapshot?.gatewayStatus?.provider}
-                </span>
-              </div>
-
-              <div className="space-y-4">
-                {/* Tier 1: Frontends */}
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  <div className="p-4 rounded-xl bg-navy-900 text-white border border-gold-500/30">
-                    <p className="text-xs text-gold-400 font-bold uppercase">
-                      Website (Responsive)
-                    </p>
-                    <p className="text-sm font-semibold mt-0.5">
-                      Apply • Manage • Grow
-                    </p>
-                  </div>
-                  <div className="p-4 rounded-xl bg-navy-900 text-white border border-gold-500/30">
-                    <p className="text-xs text-gold-400 font-bold uppercase">
-                      Customer Wallet & Mobile App
-                    </p>
-                    <p className="text-sm font-semibold mt-0.5">
-                      Bank • Borrow • Track Standing Orders
-                    </p>
-                  </div>
-                  <div className="p-4 rounded-xl bg-navy-900 text-white border border-gold-500/30">
-                    <p className="text-xs text-gold-400 font-bold uppercase">
-                      Back Office (Super Admin Portal)
-                    </p>
-                    <p className="text-sm font-semibold mt-0.5">
-                      Repayment Parameters • Disburse • Monitor
-                    </p>
-                  </div>
-                </div>
-
-                {/* Tier 2: Shared Backend Services */}
-                <div className="p-4 rounded-xl bg-slate-100 border border-slate-200">
-                  <p className="text-xs font-bold uppercase tracking-wider text-navy-900 mb-3 text-center">
-                    Shared Backend Services (Active Domain Engines)
-                  </p>
-                  <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2.5">
-                    {[
-                      "Customer & KYC Management",
-                      "Wallet & Double-Entry Ledger",
-                      "Super Admin Credit Engine",
-                      "Loan & Standing Order Engine",
-                      "Smart Card Management",
-                      "Reporting & Analytics",
-                    ].map((svc) => (
-                      <div
-                        key={svc}
-                        className="bg-white p-2.5 rounded-lg border border-slate-200 text-center text-xs font-semibold text-navy-900 shadow-sm"
-                      >
-                        {svc}
-                      </div>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Tier 3: Integration Gateway */}
-                <div className="p-4 rounded-xl bg-dbc-navy-gradient text-white border border-gold-500/40">
-                  <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
-                    <span className="text-xs font-bold uppercase tracking-wider text-gold-400">
-                      Integration Gateway (Mock Now, Flutterwave Later)
-                    </span>
-                    <span className="text-[11px] font-mono text-slate-300">
-                      src/lib/gateway/flutterwave-adapter.ts
-                    </span>
-                  </div>
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-xs">
-                    <div className="bg-white/10 p-2.5 rounded-lg border border-white/15">
-                      <span className="font-bold text-gold-300 block">
-                        Payment Partner
-                      </span>
-                      Flutterwave Wallet Funding & Virtual/Physical Cards
-                    </div>
-                    <div className="bg-white/10 p-2.5 rounded-lg border border-white/15">
-                      <span className="font-bold text-gold-300 block">
-                        Issuing Bank
-                      </span>
-                      Wema Virtual NUBAN & Card BIN Sponsorship
-                    </div>
-                    <div className="bg-white/10 p-2.5 rounded-lg border border-white/15">
-                      <span className="font-bold text-gold-300 block">
-                        Credit Bureaus
-                      </span>
-                      CRC / FirstCentral Automated Scoring
-                    </div>
-                    <div className="bg-white/10 p-2.5 rounded-lg border border-white/15">
-                      <span className="font-bold text-gold-300 block">
-                        Identity Providers
-                      </span>
-                      BVN / NIN / CAC RC Verification
-                    </div>
-                  </div>
                 </div>
               </div>
             </div>
@@ -1509,7 +1327,7 @@ export default function DBCapitalPlatformPage() {
                 onClick={() => setShowFundModal(true)}
                 className="w-full py-2.5 rounded-xl bg-dbc-gold-gradient text-navy-950 font-extrabold text-xs shadow hover:opacity-95 transition flex items-center justify-center gap-1.5"
               >
-                <Plus className="w-4 h-4" /> Fund Prepaid Wallet (Flutterwave)
+                <Plus className="w-4 h-4" /> Fund Prepaid Wallet
               </button>
             </div>
 
@@ -1586,7 +1404,7 @@ export default function DBCapitalPlatformPage() {
             <div className="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm flex flex-col justify-between">
               <div className="flex items-center justify-between">
                 <span className="text-xs uppercase tracking-wider text-slate-500 font-bold">
-                  Flutterwave Smart Cards
+                  DB Capital Smart Cards
                 </span>
                 <CreditCard className="w-5 h-5 text-gold-600" />
               </div>
@@ -1626,7 +1444,7 @@ export default function DBCapitalPlatformPage() {
                 <div className="flex items-center justify-between border-b border-slate-100 pb-3">
                   <div>
                     <span className="text-[11px] font-bold uppercase tracking-wider text-gold-600">
-                      Flutterwave Payment Gateway
+                      Multi-Channel Wallet Funding
                     </span>
                     <h3 className="text-lg font-extrabold text-navy-900">
                       Fund Prepaid Wallet ({wallet?.accountNumber})
@@ -1667,7 +1485,7 @@ export default function DBCapitalPlatformPage() {
 
                   <div>
                     <label className="block text-xs font-bold text-slate-700 mb-1">
-                      Flutterwave Payment Channel
+                      Payment Method (Any Bank or Payment Platform)
                     </label>
                     <div className="grid grid-cols-3 gap-2">
                       {(["BANK_TRANSFER", "CARD", "USSD"] as const).map(
@@ -1691,8 +1509,8 @@ export default function DBCapitalPlatformPage() {
 
                   <div className="p-3 rounded-xl bg-slate-50 border border-slate-200 text-xs text-slate-600 space-y-1">
                     <p>
-                      • Funds settle immediately into your DB Capital Prepaid
-                      Wallet.
+                      • Fund from any bank app, debit card, USSD, or payment
+                      platform into your DB Capital Prepaid Wallet.
                     </p>
                     <p>
                       • Your Wallet balance backs your{" "}
@@ -1723,14 +1541,14 @@ export default function DBCapitalPlatformPage() {
                         },
                         `Successfully funded wallet with ${formatNgn(
                           fundAmount
-                        )} via Flutterwave (${fundChannel})!`
+                        )} (${fundChannel.replace("_", " ")})!`
                       );
                       if (res) setShowFundModal(false);
                     }}
                     className="px-5 py-2.5 rounded-xl bg-dbc-gold-gradient text-navy-950 font-extrabold text-xs shadow hover:opacity-95"
                   >
                     {busyAction === "FUND_WALLET"
-                      ? "Processing via Flutterwave..."
+                      ? "Processing Payment..."
                       : `Complete Payment (${formatNgn(fundAmount)})`}
                   </button>
                 </div>
@@ -1750,9 +1568,8 @@ export default function DBCapitalPlatformPage() {
                         Active Loans & Wallet Standing Order Repayments
                       </h3>
                       <p className="text-xs text-slate-500">
-                        Loans are disbursed to your wallet and repaid via
-                        automated Standing Orders based on Super Admin
-                        parameters.
+                        Approved loans are disbursed directly to your wallet and
+                        repaid automatically via your scheduled Standing Orders.
                       </p>
                     </div>
                     <button
@@ -1772,7 +1589,7 @@ export default function DBCapitalPlatformPage() {
                         <div className="flex flex-wrap items-center justify-between gap-2">
                           <div>
                             <span className="text-[11px] font-mono font-bold text-slate-500">
-                              {loan.reference} • Rule: {loan.parameterCode}
+                              {loan.reference} • Plan: {loan.parameterCode}
                             </span>
                             <h4 className="font-bold text-navy-900 text-sm">
                               {loan.parameterName} — {loan.purpose}
@@ -1860,7 +1677,7 @@ export default function DBCapitalPlatformPage() {
                                 }
                                 className="px-3 py-1.5 rounded-lg bg-emerald-700 hover:bg-emerald-800 text-white font-bold text-xs transition"
                               >
-                                Run Next Wallet Deduction Now
+                                Pay Next Installment Now
                               </button>
                             ) : loan.status === "UNDER_REVIEW" ? (
                               isAdminSession ? (
@@ -1871,11 +1688,11 @@ export default function DBCapitalPlatformPage() {
                                   }}
                                   className="text-xs font-bold text-gold-600 underline"
                                 >
-                                  Approve & Disburse in Super Admin →
+                                  Approve & Disburse in Back Office →
                                 </button>
                               ) : (
                                 <span className="text-xs font-semibold text-amber-700 bg-amber-50 px-2.5 py-1 rounded-lg border border-amber-200">
-                                  Awaiting Super Admin Approval & Wallet Disbursement
+                                  Under Credit Review • Pending Wallet Disbursement
                                 </span>
                               )
                             ) : null}
@@ -1961,23 +1778,22 @@ export default function DBCapitalPlatformPage() {
               <div className="lg:col-span-7 bg-white rounded-2xl p-6 border border-slate-200 shadow-sm space-y-5">
                 <div>
                   <span className="text-xs font-bold uppercase tracking-wider text-gold-600">
-                    Wallet-Disbursed Credit Engine
+                    Wallet-Disbursed Credit Facility
                   </span>
                   <h3 className="text-xl font-extrabold text-navy-900">
                     Apply for Loan / Credit & Authorize Wallet Standing Order
                   </h3>
                   <p className="text-xs text-slate-500 mt-1">
-                    Select a facility below. Repayment terms are governed by{" "}
-                    <strong>Super Admin Repayment Parameters</strong>, and
-                    approved funds are disbursed directly into your DB Capital
-                    Prepaid Wallet.
+                    Select a credit plan below. Approved funds are disbursed
+                    directly into your DB Capital Prepaid Wallet and repaid via
+                    automated Standing Orders.
                   </p>
                 </div>
 
                 {/* Product Parameter Selector */}
                 <div>
                   <label className="block text-xs font-bold text-slate-700 mb-2">
-                    1. Select Super Admin Credit / Loan Product
+                    1. Select Credit / Loan Product
                   </label>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     {repaymentParameters.map((p: any) => (
@@ -2061,7 +1877,7 @@ export default function DBCapitalPlatformPage() {
                       4. Mandatory Prepaid Wallet Standing Order Mandate
                     </span>
                     <span className="text-[11px] font-mono font-bold text-amber-800">
-                      Rule: {selectedParam?.code}
+                      Plan: {selectedParam?.code}
                     </span>
                   </div>
                   <p className="text-xs text-amber-900 leading-relaxed">
@@ -2070,13 +1886,13 @@ export default function DBCapitalPlatformPage() {
                     automatically debited{" "}
                     <strong>{formatNgn(previewInstallment)}</strong> every{" "}
                     <strong>{selectedParam?.repaymentFrequency}</strong> for{" "}
-                    <strong>{previewTenure} installments</strong>. Super Admin
-                    parameters require a{" "}
+                    <strong>{previewTenure} installments</strong>. This facility
+                    requires a{" "}
                     <strong>
                       {selectedParam?.minWalletReservePercent}% wallet reserve (
                       {formatNgn(previewMinWalletReserve)})
                     </strong>{" "}
-                    and apply a{" "}
+                    and applies a{" "}
                     <strong>
                       {selectedParam?.latePenaltyPercent}% late fee
                     </strong>{" "}
@@ -2116,7 +1932,7 @@ export default function DBCapitalPlatformPage() {
                         previewInstallment
                       )} / ${
                         selectedParam.repaymentFrequency
-                      })! Ready for Super Admin disbursement.`
+                      })!`
                     )
                   }
                   className="w-full py-3.5 rounded-xl bg-dbc-navy-gradient text-gold-400 font-extrabold text-sm shadow-lg hover:opacity-95 transition flex items-center justify-center gap-2"
@@ -2130,13 +1946,13 @@ export default function DBCapitalPlatformPage() {
                 </button>
               </div>
 
-              {/* Right Column: Live Amortization & Super Admin Parameter Inspector */}
+              {/* Right Column: Live Amortization & Repayment Plan Summary */}
               <div className="lg:col-span-5 space-y-5">
                 <div className="bg-dbc-navy-gradient text-white rounded-2xl p-6 border border-gold-500/40 shadow-lg space-y-4">
                   <div className="flex items-center justify-between border-b border-white/15 pb-3">
                     <div>
                       <span className="text-[11px] uppercase tracking-wider text-gold-400 font-bold">
-                        Super Admin Parameter Preview
+                        Repayment Plan Summary
                       </span>
                       <h4 className="text-base font-extrabold">
                         {selectedParam?.name}
@@ -2254,7 +2070,7 @@ export default function DBCapitalPlatformPage() {
                             </span>
                           </div>
                           <p className="text-xs text-slate-500 mt-1">
-                            Deduction Rule:{" "}
+                            Deduction Schedule:{" "}
                             <strong className="text-navy-900">
                               {formatNgn(so.installmentAmount)}
                             </strong>{" "}
@@ -2293,7 +2109,7 @@ export default function DBCapitalPlatformPage() {
                                 }
                                 className="px-3.5 py-2 rounded-xl bg-dbc-gold-gradient text-navy-950 font-extrabold text-xs shadow"
                               >
-                                Execute Wallet Deduction Now
+                                Pay Next Installment Now
                               </button>
                             )}
                         </div>
@@ -2302,7 +2118,7 @@ export default function DBCapitalPlatformPage() {
                       {/* Execution History */}
                       <div className="bg-white rounded-xl p-3.5 border border-slate-200">
                         <p className="text-xs font-bold text-navy-900 mb-2">
-                          Standing Order Execution Audit Trail
+                          Standing Order Execution History
                         </p>
                         {(so.executions || []).length === 0 ? (
                           <p className="text-xs text-slate-400">
@@ -2348,7 +2164,7 @@ export default function DBCapitalPlatformPage() {
             </div>
           )}
 
-          {/* TAB 4: VIRTUAL & PHYSICAL SMART CARDS (POWERED BY FLUTTERWAVE) */}
+          {/* TAB 4: VIRTUAL & PHYSICAL SMART CARDS */}
           {portalTab === "SMART_CARDS" && (
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
               {/* Left Column: Customer's Existing Cards */}
@@ -2357,7 +2173,7 @@ export default function DBCapitalPlatformPage() {
                   <div className="flex items-center justify-between">
                     <div>
                       <span className="text-xs font-bold uppercase tracking-wider text-gold-600">
-                        Flutterwave Card Issuing Engine
+                        DB Capital Card Services
                       </span>
                       <h3 className="text-xl font-extrabold text-navy-900">
                         My Virtual & Physical Smart Cards
@@ -2450,9 +2266,9 @@ export default function DBCapitalPlatformPage() {
                           <div className="flex flex-wrap items-center justify-between gap-3 text-xs">
                             <div className="space-y-0.5 text-slate-600">
                               <p>
-                                Flutterwave ID:{" "}
-                                <strong className="font-mono text-navy-900">
-                                  {card.flutterwaveCardId}
+                                Spending Limit:{" "}
+                                <strong className="text-navy-900">
+                                  {formatNgn(card.spendingLimit)}
                                 </strong>
                               </p>
                               {card.cardType === "PHYSICAL" && (
@@ -2501,7 +2317,7 @@ export default function DBCapitalPlatformPage() {
                                           ? "FREEZE"
                                           : "UNFREEZE",
                                     },
-                                    `Smart Card ${card.maskedPan} status updated via Flutterwave Gateway!`
+                                    `Smart Card ${card.maskedPan} status updated!`
                                   )
                                 }
                                 className="px-3 py-1.5 rounded-lg border border-slate-300 bg-white text-navy-900 font-bold flex items-center gap-1"
@@ -2549,7 +2365,7 @@ export default function DBCapitalPlatformPage() {
                                     },
                                     `Transferred ${formatNgn(
                                       cardTopUpAmount[card.id] || 20000
-                                    )} from Prepaid Wallet to Flutterwave Card ${
+                                    )} from Prepaid Wallet to Smart Card ${
                                       card.maskedPan
                                     }!`
                                   )
@@ -2572,7 +2388,7 @@ export default function DBCapitalPlatformPage() {
                 <div className="bg-white rounded-2xl p-6 border border-slate-200 shadow-sm space-y-4">
                   <div>
                     <span className="text-xs font-bold uppercase tracking-wider text-gold-600">
-                      Powered by Flutterwave Gateway
+                      Instant Card Issuance
                     </span>
                     <h3 className="text-lg font-extrabold text-navy-900">
                       Apply for Virtual or Physical Smart Card
@@ -2703,7 +2519,7 @@ export default function DBCapitalPlatformPage() {
                               ? cardDeliveryAddress
                               : undefined,
                         },
-                        `Issued new Flutterwave ${cardType} ${cardBrand} Smart Card and funded ${formatNgn(
+                        `Issued new ${cardType} ${cardBrand} Smart Card and funded ${formatNgn(
                           cardInitialFund
                         )} from your wallet!`
                       )
@@ -2711,7 +2527,7 @@ export default function DBCapitalPlatformPage() {
                     className="w-full py-3 rounded-xl bg-dbc-gold-gradient text-navy-950 font-extrabold text-xs shadow-md hover:opacity-95 transition"
                   >
                     {busyAction === "ISSUE_SMART_CARD"
-                      ? "Provisioning via Flutterwave Gateway..."
+                      ? "Issuing Smart Card..."
                       : `Issue ${cardType} Card (Wallet Debit: ${formatNgn(
                           Number(cardInitialFund || 0) +
                             (cardType === "PHYSICAL" ? 2500 : 1000)
@@ -2728,11 +2544,11 @@ export default function DBCapitalPlatformPage() {
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <div>
                   <h3 className="text-lg font-extrabold text-navy-900">
-                    Prepaid Wallet Double-Entry Statement ({wallet?.accountNumber})
+                    Prepaid Wallet Statement ({wallet?.accountNumber})
                   </h3>
                   <p className="text-xs text-slate-500">
-                    Complete audit trail of Flutterwave wallet funding, loan
-                    disbursements, standing order repayments, and card loads.
+                    Complete statement of wallet funding, loan disbursements,
+                    standing order repayments, and card transactions.
                   </p>
                 </div>
                 <button
@@ -2750,7 +2566,7 @@ export default function DBCapitalPlatformPage() {
                       <th className="py-3 px-3">Reference</th>
                       <th className="py-3 px-3">Category</th>
                       <th className="py-3 px-3">Description</th>
-                      <th className="py-3 px-3">Gateway</th>
+                      <th className="py-3 px-3">Date</th>
                       <th className="py-3 px-3 text-right">Amount</th>
                       <th className="py-3 px-3 text-right">Balance After</th>
                     </tr>
@@ -2770,7 +2586,7 @@ export default function DBCapitalPlatformPage() {
                           {tx.description}
                         </td>
                         <td className="py-3 px-3 font-mono text-[11px] text-slate-500">
-                          {tx.gatewayProvider}
+                          {new Date(tx.createdAt).toLocaleDateString()}
                         </td>
                         <td
                           className={`py-3 px-3 text-right font-extrabold ${
@@ -3867,12 +3683,12 @@ export default function DBCapitalPlatformPage() {
             </span>
             <span>•</span>
             <span>
-              Pre-Integration Website, Customer Wallet & Super Admin Back Office
+              Prepaid Wallets • Personal & Business Credit • Smart Cards
             </span>
           </div>
           <div className="flex items-center gap-4">
             <span className="flex items-center gap-1 text-emerald-400">
-              <ShieldCheck className="w-4 h-4" /> Double-Entry Wallet Ledger
+              <ShieldCheck className="w-4 h-4" /> Secure Digital Wallet
             </span>
             <span className="flex items-center gap-1 text-gold-300">
               <Clock className="w-4 h-4" /> Automated Standing Orders
