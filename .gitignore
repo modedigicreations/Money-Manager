@@ -1,0 +1,9 @@
+node_modules/
+.next/
+out/
+prisma/*.db
+prisma/*.db-wal
+prisma/*.db-shm
+.DS_Store
+*.tsbuildinfo
+next-env.d.ts

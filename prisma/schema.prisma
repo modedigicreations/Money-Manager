@@ -1,0 +1,194 @@
+// DB Capital Smart Financial Platform — Prisma Schema
+// Supports SQLite for local zero-config development and PostgreSQL for production deployment.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite" // Change to "postgresql" in production
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id                 String            @id @default(cuid())
+  email              String            @unique
+  fullName           String
+  phone              String
+  role               String            @default("CUSTOMER") // CUSTOMER | ADMIN | SUPER_ADMIN
+  accountType        String            @default("INDIVIDUAL") // INDIVIDUAL | BUSINESS
+  businessName       String?
+  rcNumber           String?
+  bvn                String?
+  nin                String?
+  kycStatus          String            @default("VERIFIED") // PENDING | VERIFIED | REJECTED
+  kycTier            Int               @default(2) // Tier 1, 2, 3
+  creditScore        Int               @default(720)
+  createdAt          DateTime          @default(now())
+
+  wallet             Wallet?
+  standingOrders     StandingOrder[]
+  loans              LoanApplication[]
+  smartCards         SmartCard[]
+}
+
+model Wallet {
+  id                 String              @id @default(cuid())
+  userId             String              @unique
+  accountNumber      String              @unique
+  bankName           String              @default("DB Capital / Wema Virtual")
+  currency           String              @default("NGN")
+  balance            Float               @default(0)
+  lockedBalance      Float               @default(0)
+  status             String              @default("ACTIVE")
+  updatedAt          DateTime            @updatedAt
+
+  user               User                @relation(fields: [userId], references: [id])
+  transactions       LedgerTransaction[]
+}
+
+model LedgerTransaction {
+  id                 String   @id @default(cuid())
+  walletId           String
+  reference          String   @unique
+  type               String   // CREDIT | DEBIT
+  category           String   // WALLET_FUNDING | LOAN_DISBURSEMENT | STANDING_ORDER_REPAYMENT | CARD_FUNDING | CARD_ISSUANCE_FEE | PENALTY_FEE
+  amount             Float
+  balanceBefore      Float
+  balanceAfter       Float
+  description        String
+  gatewayProvider    String   @default("FLUTTERWAVE_MOCK")
+  gatewayReference   String?
+  status             String   @default("SUCCESS")
+  metadataJson       String?
+  createdAt          DateTime @default(now())
+
+  wallet             Wallet   @relation(fields: [walletId], references: [id])
+}
+
+model RepaymentParameter {
+  id                      String            @id @default(cuid())
+  name                    String
+  code                    String            @unique
+  category                String            // PERSONAL_LOAN | BUSINESS_FINANCE | SMART_CARD_CREDIT
+  interestRatePercent     Float             // e.g. 4.5 (% per cycle or monthly flat)
+  repaymentFrequency      String            // WEEKLY | BIWEEKLY | MONTHLY
+  tenureCount             Int               // Number of installments (e.g. 3, 6, 12)
+  minAmount               Float
+  maxAmount               Float
+  gracePeriodDays         Int               @default(2)
+  latePenaltyPercent      Float             @default(1.5)
+  minWalletReservePercent Float             @default(10.0) // Customer wallet buffer requirement
+  minCreditScore          Int               @default(600)
+  isActive                Boolean           @default(true)
+  updatedBy               String            @default("Super Admin")
+  createdAt               DateTime          @default(now())
+  updatedAt               DateTime          @updatedAt
+
+  loans                   LoanApplication[]
+  standingOrders          StandingOrder[]
+}
+
+model StandingOrder {
+  id                   String                   @id @default(cuid())
+  mandateReference     String                   @unique
+  userId               String
+  walletId             String
+  repaymentParameterId String
+  loanApplicationId    String?                  @unique
+  frequency            String                   // WEEKLY | BIWEEKLY | MONTHLY
+  installmentAmount    Float
+  reservedAmount       Float                    @default(0)
+  totalInstallments    Int
+  completedInstallments Int                     @default(0)
+  failedAttempts       Int                      @default(0)
+  nextExecutionDate    String
+  status               String                   @default("ACTIVE") // ACTIVE | PAUSED | COMPLETED | CANCELLED | DEFAULTED
+  authorizedAt         DateTime                 @default(now())
+
+  user                 User                     @relation(fields: [userId], references: [id])
+  repaymentParameter   RepaymentParameter       @relation(fields: [repaymentParameterId], references: [id])
+  loanApplication      LoanApplication?         @relation(fields: [loanApplicationId], references: [id])
+  executions           StandingOrderExecution[]
+}
+
+model StandingOrderExecution {
+  id                String        @id @default(cuid())
+  standingOrderId   String
+  installmentNumber Int
+  amountAttempted   Float
+  walletBalanceAtRun Float
+  status            String        // SUCCESS | INSUFFICIENT_FUNDS
+  ledgerTxReference String?
+  notes             String
+  executedAt        DateTime      @default(now())
+
+  standingOrder     StandingOrder @relation(fields: [standingOrderId], references: [id])
+}
+
+model LoanApplication {
+  id                   String              @id @default(cuid())
+  reference            String              @unique
+  userId               String
+  repaymentParameterId String
+  purpose              String
+  principalAmount      Float
+  interestAmount       Float
+  totalPayable         Float
+  amountPaid           Float               @default(0)
+  remainingBalance     Float
+  installmentAmount    Float
+  tenureCount          Int
+  frequency            String
+  status               String              @default("UNDER_REVIEW") // UNDER_REVIEW | APPROVED_DISBURSED | REPAID | OVERDUE | REJECTED
+  adminNotes           String?
+  disbursedAt          DateTime?
+  createdAt            DateTime            @default(now())
+
+  user                 User                @relation(fields: [userId], references: [id])
+  repaymentParameter   RepaymentParameter  @relation(fields: [repaymentParameterId], references: [id])
+  standingOrder        StandingOrder?
+  schedules            RepaymentSchedule[]
+}
+
+model RepaymentSchedule {
+  id                String          @id @default(cuid())
+  loanApplicationId String
+  installmentNumber Int
+  dueDate           String
+  principalPortion  Float
+  interestPortion   Float
+  totalAmount       Float
+  penaltyAmount     Float           @default(0)
+  status            String          @default("PENDING") // PENDING | PAID | OVERDUE_INSUFFICIENT_FUNDS
+  paidAt            DateTime?
+  txReference       String?
+
+  loanApplication   LoanApplication @relation(fields: [loanApplicationId], references: [id])
+}
+
+model SmartCard {
+  id                  String   @id @default(cuid())
+  userId              String
+  cardType            String   // VIRTUAL | PHYSICAL
+  cardBrand           String   @default("VERVE_MASTERCARD") // MASTERCARD | VERVE | VISA
+  cardTier            String   @default("GOLD_EXECUTIVE")
+  maskedPan           String
+  fullPanMock         String
+  cvvMock             String
+  expiryMonth         String
+  expiryYear          String
+  cardholderName      String
+  currency            String   @default("NGN")
+  cardBalance         Float    @default(0)
+  spendingLimit       Float    @default(1500000)
+  creditLineLinked    Boolean  @default(false)
+  flutterwaveCardId   String   @unique
+  gatewayMode         String   @default("FLUTTERWAVE_MOCK")
+  deliveryAddress     String?
+  deliveryStatus      String?  // N/A | PROCESSING | DISPATCHED | DELIVERED
+  status              String   @default("ACTIVE") // PENDING_APPROVAL | ACTIVE | FROZEN | TERMINATED
+  createdAt           DateTime @default(now())
+
+  user                User     @relation(fields: [userId], references: [id])
+}
